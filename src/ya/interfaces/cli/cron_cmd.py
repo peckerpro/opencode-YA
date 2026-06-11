@@ -65,9 +65,12 @@ def remove_job(job_id: str = typer.Argument(...)) -> None:
     async def _remove() -> None:
         store = _get_store()
         await store.initialize()
-        await store.delete_job(job_id)
+        deleted = await store.delete_job(job_id)
         await store.close()
-        console.print("[green]Job removed[/green]")
+        if deleted:
+            console.print(f"[green]Job '{job_id[:8]}' removed[/green]")
+        else:
+            console.print(f"[yellow]Job '{job_id[:8]}' not found[/yellow]")
     asyncio.run(_remove())
 
 

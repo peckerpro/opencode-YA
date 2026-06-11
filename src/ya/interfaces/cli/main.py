@@ -113,6 +113,7 @@ def run(
     prompt: str = typer.Argument(..., help="Prompt to execute"),
     model: str = typer.Option("MiniMax-M3", "--model", "-m", help="Model to use"),
     max_steps: int = typer.Option(10, "--max-steps", help="Maximum agent steps"),
+    session: str = typer.Option("", "--session", "-s", help="Session ID (reuse for multi-turn context)"),
 ) -> None:
     async def _run() -> None:
         settings = load_settings()
@@ -143,15 +144,25 @@ def run(
         store = SqliteSessionStore(paths.state_db)
         await store.initialize()
 
-        session = Session(id=uuid.uuid4().hex[:12], title=f"Run: {prompt[:50]}")
-        await store.create_session(session)
+        sid = session or uuid.uuid4().hex[:12]
+        existing = await store.get_session(sid)
+        if existing is not None and not session:
+            sid = uuid.uuid4().hex[:12]
+        elif existing is None:
+            sess = Session(id=sid, title=f"Run: {prompt[:50]}")
+            await store.create_session(sess)
+        else:
+            sess = existing
 
         loop = AgentLoop(provider=provider, store=store, registry=registry, policy=policy, config=AgentLoopConfig(max_steps=max_steps))  # type: ignore[arg-type]
 
         console.print(f"[bold]Running:[/bold] {prompt}")
-        await loop.run(session, prompt)
+        console.print(f"[dim]Session: {sid}[/dim]")
+        if session:
+            console.print("[dim](reusing existing session)[/dim]")
+        await loop.run(sess, prompt)
 
-        messages = await store.get_messages(session.id)
+        messages = await store.get_messages(sess.id)
         for msg in messages:
             if msg.role.value == "assistant":
                 console.print(Markdown(msg.content or ""))

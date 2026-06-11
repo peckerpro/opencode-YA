@@ -110,9 +110,13 @@ class SchedulerStore:
         ) as cursor:
             return [_row_to_job(r) for r in await cursor.fetchall()]
 
-    async def delete_job(self, job_id: str) -> None:
+    async def delete_job(self, job_id: str) -> bool:
+        existing = await self.get_job(job_id)
+        if existing is None:
+            return False
         await self.conn.execute("DELETE FROM cron_jobs WHERE id = ?", (job_id,))
         await self.conn.commit()
+        return True
 
     async def update_next_run(self, job_id: str, next_run_at: str | None) -> None:
         await self.conn.execute(
