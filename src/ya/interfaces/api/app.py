@@ -3,6 +3,8 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from ya.interfaces.api.root import router as root_router
+
 
 def create_app() -> FastAPI:
     app = FastAPI(
@@ -17,6 +19,8 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    app.include_router(root_router)
 
     @app.get("/health")
     async def health() -> dict[str, str]:
@@ -50,6 +54,14 @@ def create_app() -> FastAPI:
             "llm_model": settings.ya_llm_model,
             "minimax_configured": settings.minimax_api_key is not None,
         }
+
+    @app.get("/api/memory")
+    async def list_memories() -> dict[str, object]:
+        return {"memories": [], "total": 0}
+
+    @app.get("/api/cron/jobs")
+    async def list_cron_jobs() -> dict[str, object]:
+        return {"jobs": [], "total": 0}
 
     return app
 

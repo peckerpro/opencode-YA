@@ -108,3 +108,14 @@ def tools_list() -> None:
         )
 
     console.print(table)
+
+
+@app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1", "--host", "-h", help="Bind address"),
+    port: int = typer.Option(8000, "--port", "-p", help="Bind port"),
+) -> None:
+    import uvicorn
+    console.print(f"[bold]Starting YA server on {host}:{port}[/bold]")
+    console.print("[dim]API docs: http://{host}:{port}/docs[/dim]")
+    uvicorn.run("ya.interfaces.api.app:app", host=host, port=port, reload=False)

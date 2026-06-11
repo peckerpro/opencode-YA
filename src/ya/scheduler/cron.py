@@ -20,7 +20,8 @@ def calculate_next_run(job: CronJob, after: datetime | None = None) -> datetime 
     if job.schedule_type == ScheduleType.CRON:
         try:
             cron = croniter(job.schedule_value, base)
-            return cron.get_next(datetime)
+            result = cron.get_next(datetime)
+            return result if isinstance(result, datetime) else None
         except (ValueError, KeyError):
             return None
 
