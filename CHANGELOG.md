@@ -47,6 +47,16 @@
 - **Project Workspace**: Project/Workspace domain models, ProjectService with JSON persistence (create/get/list/archive), workspace isolation (V3-009)
 - **Testing**: 161 tests total, 80% coverage, ruff + mypy clean on 74 source files
 
+### Added — v0.4.0 (2026-06-12)
+
+- **Permission System**: 30+ Capability definitions, PermissionPolicy with deny priority, PermissionGuard unified authorization, Scope model (global/session/project/workspace) (V4-001)
+- **Audit + Confirmation**: Append-only AuditStore with query/filter, PermissionDecision with confirmation flag, actor/role/result tracking (V4-002)
+- **Role Profiles**: 7 roles — Root, Planner, Coding, Review, Test, Document, Coordinator — each with capability sets and explicit restrictions (V4-003)
+- **Team Coordinator**: Agent registration, exclusive task assignment, lease heartbeat, idle/busy tracking, duplicate assignment prevention, event logging (V4-004)
+- **Role Flows**: Planner→Coding→Review→Testing→Document gates with capability enforcement (V4-005, V4-006)
+- **Root Team Control**: Coordinator status queries, agent lifecycle management, team-level permission scope (V4-007)
+- **Testing**: 183 tests total, 81% coverage, ruff + mypy clean on 79 source files
+
 <!--
 真实功能完成后使用以下分类：
 
