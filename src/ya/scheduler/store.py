@@ -13,6 +13,8 @@ class SchedulerStore:
         self._db_path = db_path
 
     async def initialize(self) -> None:
+        from pathlib import Path
+        Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
         self._conn = await aiosqlite.connect(self._db_path)
         self._conn.row_factory = aiosqlite.Row
         await self._conn.execute("PRAGMA journal_mode=WAL")
