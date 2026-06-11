@@ -91,3 +91,27 @@ async def root_status() -> dict[str, object]:
 @router.get("/active-agents")
 async def active_agents() -> list[dict[str, str]]:
     return []
+
+
+@router.get("/approvals")
+async def list_approvals() -> dict[str, object]:
+    return {"pending": [], "total": 0}
+
+
+@router.post("/approvals/{approval_id}/approve")
+async def approve(approval_id: str) -> dict[str, str]:
+    return {"status": "approved"}
+
+
+@router.post("/approvals/{approval_id}/deny")
+async def deny(approval_id: str) -> dict[str, str]:
+    return {"status": "denied"}
+
+
+@router.get("/summarize-all")
+async def summarize_all() -> dict[str, object]:
+    return {
+        "total_sessions": 0,
+        "active_sessions": 0,
+        "attention_items": [],
+    }
