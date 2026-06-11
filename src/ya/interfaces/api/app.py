@@ -63,6 +63,10 @@ def create_app() -> FastAPI:
     async def list_cron_jobs() -> dict[str, object]:
         return {"jobs": [], "total": 0}
 
+    @app.post("/api/cron/jobs")
+    async def create_cron_job() -> dict[str, str]:
+        return {"status": "created"}
+
     return app
 
 
