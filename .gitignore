@@ -1,0 +1,66 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+*.manifest
+*.spec
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# uv
+uv.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing & coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.pytest_cache/
+
+# Type checking
+.mypy_cache/
+.ruff_cache/
+
+# YA runtime data (generated at runtime, not committed)
+.ya/logs/
+.ya/memory/
+.ya/rag/
+.ya/cron/
+.ya/tmp/
+.ya/workspace/events.jsonl
+.ya/workspace/locks/
+.ya/workspace/handoffs/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# OS
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
