@@ -67,6 +67,10 @@ def create_app() -> FastAPI:
     async def create_cron_job() -> dict[str, str]:
         return {"status": "created"}
 
+    @app.post("/api/rag/query")
+    async def rag_query(query: str = "") -> dict[str, object]:
+        return {"results": [], "query": query}
+
     return app
 
 

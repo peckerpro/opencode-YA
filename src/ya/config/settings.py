@@ -27,6 +27,10 @@ class Settings(BaseSettings):
 
     github_token: SecretStr | None = None
 
+    volcengine_api_key: SecretStr | None = None
+    volcengine_embedding_model: str = "doubao-embedding-vision-251215"
+    volcengine_base_url: str = "https://ark.cn-beijing.volces.com/api/v3"
+
     @property
     def ya_home_expanded(self) -> Path:
         return self.ya_home.expanduser().resolve()
