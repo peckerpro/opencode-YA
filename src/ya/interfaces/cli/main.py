@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import sys
+import uuid
 
 import typer
 from rich.console import Console
+from rich.markdown import Markdown
 
 from ya import __version__
 from ya.config.paths import resolve_paths
@@ -35,22 +38,125 @@ def main(
 @app.command()
 def chat(
     session_id: str = typer.Option("", "--session", "-s", help="Session ID to resume"),
-    model: str = typer.Option("", "--model", "-m", help="Model to use"),
+    model: str = typer.Option("MiniMax-M3", "--model", "-m", help="Model to use"),
     new: bool = typer.Option(False, "--new", "-n", help="Start a new session"),
 ) -> None:
-    console.print("[bold]YA Chat[/bold] (type /exit to quit, /help for commands)")
-    console.print("[dim]Note: Real LLM integration requires MiniMax API key configured[/dim]")
+    async def _chat() -> None:
+        settings = load_settings()
+        api_key = settings.minimax_api_key
+        if api_key is None:
+            console.print("[red]Error: MINIMAX_API_KEY not set.[/red]")
+            raise typer.Exit(code=1)
+
+        from ya.adapters.llm.minimax import MiniMaxProvider
+        from ya.adapters.stores.sqlite import SqliteSessionStore
+        from ya.application.chat import AgentLoop, AgentLoopConfig
+        from ya.domain.sessions.models import Session
+        from ya.tools.builtin.utc_time import UtcTimeTool
+        from ya.tools.policy import PermissionPolicy
+        from ya.tools.registry import ToolRegistry
+
+        paths = resolve_paths(settings)
+        paths.state_db.parent.mkdir(parents=True, exist_ok=True)
+
+        provider = MiniMaxProvider(api_key=api_key.get_secret_value(), model=model)
+        registry = ToolRegistry()
+        registry.register(UtcTimeTool())
+        policy = PermissionPolicy()
+        store = SqliteSessionStore(paths.state_db)
+        await store.initialize()
+
+        sid = session_id or uuid.uuid4().hex[:8]
+        session = await store.get_session(sid)
+        if session is None or new:
+            session = Session(id=sid, title=f"Chat {sid}")
+            await store.create_session(session)
+
+        loop = AgentLoop(provider=provider, store=store, registry=registry, policy=policy, config=AgentLoopConfig(max_steps=10))  # type: ignore[arg-type]
+
+        console.print(f"[bold]YA Chat[/bold] (session: {session.id})")
+        console.print("[dim]Type /exit to quit, /new for new session[/dim]")
+
+        while True:
+            try:
+                user_input = input("\nYou: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                break
+            if not user_input:
+                continue
+            if user_input == "/exit":
+                break
+            if user_input == "/new":
+                sid = uuid.uuid4().hex[:8]
+                session = Session(id=sid, title=f"Chat {sid}")
+                await store.create_session(session)
+                console.print(f"[dim]New session: {sid}[/dim]")
+                continue
+
+            await loop.run(session, user_input)
+            messages = await store.get_messages(session.id)
+            last = [m for m in messages if m.role.value == "assistant"]
+            if last:
+                console.print(f"\nYA: {last[-1].content or ''}")
+
+        await store.close()
+
+    asyncio.run(_chat())
 
 
 @app.command()
 def run(
     prompt: str = typer.Argument(..., help="Prompt to execute"),
-    model: str = typer.Option("", "--model", "-m", help="Model to use"),
+    model: str = typer.Option("MiniMax-M3", "--model", "-m", help="Model to use"),
     max_steps: int = typer.Option(10, "--max-steps", help="Maximum agent steps"),
 ) -> None:
-    console.print(f"[bold]Running:[/bold] {prompt}")
-    console.print(f"[dim]Max steps: {max_steps}[/dim]")
-    console.print("[dim]Note: Real LLM integration requires MiniMax API key configured[/dim]")
+    async def _run() -> None:
+        settings = load_settings()
+        api_key = settings.minimax_api_key
+        if api_key is None:
+            console.print("[red]Error: MINIMAX_API_KEY not set. Run 'ya doctor' for help.[/red]")
+            raise typer.Exit(code=1)
+
+        from ya.adapters.llm.minimax import MiniMaxProvider
+        from ya.adapters.stores.sqlite import SqliteSessionStore
+        from ya.application.chat import AgentLoop, AgentLoopConfig
+        from ya.domain.sessions.models import Session
+        from ya.tools.builtin.utc_time import UtcTimeTool
+        from ya.tools.policy import PermissionPolicy
+        from ya.tools.registry import ToolRegistry
+
+        paths = resolve_paths(settings)
+        paths.state_db.parent.mkdir(parents=True, exist_ok=True)
+
+        provider = MiniMaxProvider(
+            api_key=api_key.get_secret_value(),
+            base_url=settings.minimax_base_url,
+            model=model or settings.ya_llm_model,
+        )
+        registry = ToolRegistry()
+        registry.register(UtcTimeTool())
+        policy = PermissionPolicy()
+        store = SqliteSessionStore(paths.state_db)
+        await store.initialize()
+
+        session = Session(id=uuid.uuid4().hex[:12], title=f"Run: {prompt[:50]}")
+        await store.create_session(session)
+
+        loop = AgentLoop(provider=provider, store=store, registry=registry, policy=policy, config=AgentLoopConfig(max_steps=max_steps))  # type: ignore[arg-type]
+
+        console.print(f"[bold]Running:[/bold] {prompt}")
+        await loop.run(session, prompt)
+
+        messages = await store.get_messages(session.id)
+        for msg in messages:
+            if msg.role.value == "assistant":
+                console.print(Markdown(msg.content or ""))
+            elif msg.role.value == "tool":
+                console.print(f"[dim]🔧 {msg.name}: {msg.content}[/dim]")
+
+        await store.close()
+
+    asyncio.run(_run())
 
 
 @app.command()

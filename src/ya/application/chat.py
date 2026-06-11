@@ -137,19 +137,17 @@ class AgentLoop:
             messages = await self._store.get_messages(session.id)
             response = await self._provider.generate(messages, tools)
 
-            if response.content:
+            if response.tool_calls:
                 assistant_msg = Message(
                     role=MessageRole.ASSISTANT,
                     content=response.content,
+                    tool_calls=response.tool_calls,
                     tool_call_id=_new_id(),
                     created_at=utc_now(),
                 )
                 await self._store.append_message(session.id, assistant_msg)
-                await self._log_event(run.id, "text_response", response.content)
-                run.status = RunStatus.COMPLETED
-                break
+                await self._log_event(run.id, "tool_call", str(response.tool_calls))
 
-            if response.tool_calls:
                 for tc in response.tool_calls:
                     if self._cancelled:
                         break
@@ -183,6 +181,18 @@ class AgentLoop:
                     await self._log_event(run.id, "tool_result", result.content)
 
                 continue
+
+            if response.content:
+                assistant_msg = Message(
+                    role=MessageRole.ASSISTANT,
+                    content=response.content,
+                    tool_call_id=_new_id(),
+                    created_at=utc_now(),
+                )
+                await self._store.append_message(session.id, assistant_msg)
+                await self._log_event(run.id, "text_response", response.content)
+                run.status = RunStatus.COMPLETED
+                break
 
             run.status = RunStatus.COMPLETED
             break
