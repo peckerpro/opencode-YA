@@ -9,6 +9,7 @@ from ya import __version__
 from ya.config.paths import resolve_paths
 from ya.config.settings import load_settings
 from ya.interfaces.cli.cron_cmd import cron_app
+from ya.interfaces.cli.skill_cmd import skill_app
 
 app = typer.Typer(
     name="ya",
@@ -16,6 +17,7 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(cron_app, name="cron")
+app.add_typer(skill_app, name="skill")
 console = Console()
 
 
