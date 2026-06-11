@@ -2,7 +2,7 @@
 
 YA 是一个 Linux-first 的个人全量 agent，用于日常助手、个人项目开发、multi-agent 协作、长期记忆、RAG 与工具调用。
 
-> 当前状态：v0.2 Knowledge + Web + Scheduler + Root Read 已完成。129 测试通过。
+> 当前状态：v0.3 Extensibility + Root Control 已完成。161 测试通过。
 
 ## 目标
 

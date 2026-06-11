@@ -34,6 +34,19 @@
 - **Root API**: Session list/inspect/status, memory overview, `ya serve` command (127.0.0.1:8000) (V2-008)
 - **Testing**: 129 tests total, 83% coverage, ruff + mypy clean on 57 source files
 
+### Added — v0.3.0 (2026-06-12)
+
+- **MCP Client**: JSON-RPC 2.0 stdio transport, initialize/tools/list/tools/call, async read loop with request/response correlation, timeout handling (V3-001)
+- **MCP Server**: Expose YA tools as MCP-compatible JSON-RPC server over stdio, tool allowlist integration (V3-002)
+- **Skill Loader**: YAML frontmatter parsing (SKILL.md), install/enable/disable/remove local skills, SkillRegistry with source hash tracking, community content default-disabled (V3-003)
+- **Custom Tools**: Callable handler with CircuitBreaker (failure threshold + auto-recovery), ConfirmationStore (request/approve/deny), runtime safety pipeline (V3-004)
+- **GitHub Sync**: GitSyncBackend with async status/pull/commit_and_push, SyncBackend port protocol (V3-005)
+- **TUI**: Terminal UI framework with rich-based panels, chat/sidebar/input layout (V3-006)
+- **Scheduler Integrations**: Pre-built job templates (memory sync, RAG re-index, task check), per-job CircuitBreakerExecutor, typed job executors (V3-007)
+- **Root Session Control**: Session lifecycle API (pause/resume/archive/close), cross-session instruction delivery, ya root CLI (sessions/status/send/spawn/summarize-today) (V3-008)
+- **Project Workspace**: Project/Workspace domain models, ProjectService with JSON persistence (create/get/list/archive), workspace isolation (V3-009)
+- **Testing**: 161 tests total, 80% coverage, ruff + mypy clean on 74 source files
+
 <!--
 真实功能完成后使用以下分类：
 
