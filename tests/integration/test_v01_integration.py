@@ -5,18 +5,16 @@ from pathlib import Path
 
 import pytest
 
+from tests.unit.agents.test_agent_loop import FakeProvider
 from ya.adapters.stores.sqlite import SqliteSessionStore
 from ya.adapters.stores.task_files import FileTaskStore
 from ya.application.chat import AgentLoop, AgentLoopConfig
 from ya.domain.messages.models import LLMResponse, Message, MessageRole
-from ya.domain.sessions.models import Session, SessionStatus
+from ya.domain.sessions.models import Session
 from ya.domain.tasks.models import Task, TaskStatus
-from ya.ports.tools import ToolDefinition
 from ya.tools.builtin.utc_time import UtcTimeTool
 from ya.tools.policy import PermissionPolicy
 from ya.tools.registry import ToolRegistry
-
-from tests.unit.agents.test_agent_loop import FakeProvider
 
 
 class TestV01Integration:
