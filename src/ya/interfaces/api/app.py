@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from ya.interfaces.api.root import router as root_router
+
+STATIC_DIR = Path(__file__).parent.parent / "web" / "static"
 
 
 def create_app() -> FastAPI:
@@ -21,6 +26,15 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(root_router)
+
+    if STATIC_DIR.exists():
+        app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+        from fastapi.responses import FileResponse
+
+        @app.get("/")
+        async def index() -> FileResponse:
+            return FileResponse(str(STATIC_DIR / "index.html"))
 
     @app.get("/health")
     async def health() -> dict[str, str]:

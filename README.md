@@ -2,7 +2,7 @@
 
 YA 是一个 Linux-first 的个人全量 agent，用于日常助手、个人项目开发、multi-agent 协作、长期记忆、RAG 与工具调用。
 
-> 当前状态：v0.1 Local Agent Core 已完成。CLI 可运行，LLM 对话需配置 MiniMax API key。
+> 当前状态：v0.2 Knowledge + Web + Scheduler + Root Read 已完成。129 测试通过。
 
 ## 目标
 
@@ -48,9 +48,20 @@ ya chat          # 交互式对话（需 MiniMax API key）
 ya run           # 单次非交互执行
 ya doctor        # 环境/配置诊断
 ya tools list    # 已注册工具列表
+ya serve         # 启动 Web 服务 (127.0.0.1:8000)
+ya cron list     # 定时任务管理
+ya cron add      # 添加定时任务
 ```
 
-以下命令计划在 v0.2+ 实现：
+以下命令计划在 v0.3+ 实现：
+
+```text
+ya mcp ...
+ya memory ...
+ya rag ...
+ya skill ...
+ya root ...
+```
 
 ```text
 ya chat

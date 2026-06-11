@@ -22,6 +22,18 @@
 - **CLI**: ya (--help/--version), ya chat, ya run, ya doctor, ya tools — typer + rich interface (YA-006)
 - **Testing**: 84 tests (69 unit + 3 integration + 10 CLI + 2 misc), ruff clean, mypy strict mode clean, 82% coverage
 
+### Added — v0.2.0 (2026-06-12)
+
+- **Markdown Memory**: Obsidian-compatible YAML frontmatter, daily/project/topic/episodic paths, full-text search, tag filter, Chinese content, wikilink-ready (V2-001)
+- **Document Parser**: TextParser (line-by-line) + MarkdownParser (headings, code blocks, section tracking), UTF-8 safe (V2-002)
+- **RAG Pipeline**: Volcengine doubao-embedding adapter, SQLite + numpy cosine vector store, ingest (parse→chunk→embed→store), query with namespace isolation, content hash + source tracking (V2-003)
+- **FastAPI**: /health, /api/tools, /api/config, /api/memory, /api/cron, /api/rag/query, /api/root/sessions, /docs (V2-004, V2-008)
+- **Web UI**: Single-page console with Chat, Tools, Tasks, RAG, Cron panels, dark theme, vanilla JS (V2-005)
+- **Scheduler Core**: CronJob/JobRun models, cron/interval/daily/weekly/monthly schedule calculation, SQLite persistence, occurrence dedup, due job query (V2-006)
+- **Scheduler Runner**: Job execution with run records, SchedulerService tick loop, ya cron CLI (list/add/remove/pause/resume/run/logs) (V2-007)
+- **Root API**: Session list/inspect/status, memory overview, `ya serve` command (127.0.0.1:8000) (V2-008)
+- **Testing**: 129 tests total, 83% coverage, ruff + mypy clean on 57 source files
+
 <!--
 真实功能完成后使用以下分类：
 
