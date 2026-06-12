@@ -8,8 +8,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 if TYPE_CHECKING:
-    from ya.application.container import ServiceContainer
-    from ya.domain.sessions.models import Session
+    pass
 
 
 async def _chat_loop(console: Console) -> None:

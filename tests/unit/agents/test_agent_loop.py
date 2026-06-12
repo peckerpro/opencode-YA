@@ -111,8 +111,8 @@ class TestAgentLoop:
 
         assert run.status.value == "completed"
         messages = await store.get_messages("s1")
-        assert len(messages) == 2
-        assert messages[1].content == "Hello, world!"
+        assert len(messages) == 3
+        assert messages[2].content == "Hello, world!"
 
     @pytest.mark.asyncio
     async def test_multi_turn_context(
@@ -129,7 +129,7 @@ class TestAgentLoop:
         await loop.run(session, "Turn 2")
 
         messages = await store.get_messages("s1")
-        assert len(messages) == 4
+        assert len(messages) == 5
 
     @pytest.mark.asyncio
     async def test_tool_call_loop(

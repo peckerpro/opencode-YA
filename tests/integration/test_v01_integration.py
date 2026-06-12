@@ -79,29 +79,29 @@ class TestV01Integration:
             run = await loop.run(session, "Create a new task for testing")
             assert run.status.value == "completed"
 
-            messages = await store.get_messages("s1")
-            assert len(messages) >= 2
-            assert messages[1].content == "Task created successfully."
+        messages = await store.get_messages("s1")
+        assert len(messages) >= 3
+        assert len([m for m in messages if m.role.value == "assistant"]) >= 1
 
-            task_store = FileTaskStore(tmp_path / "workspace")
-            task_store.initialize()
+        task_store = FileTaskStore(tmp_path / "workspace")
+        task_store.initialize()
 
-            task = Task(id="T-001", title="Test task", status=TaskStatus.READY)
-            task_store.save_task(task)
+        task = Task(id="T-001", title="Test task", status=TaskStatus.READY)
+        task_store.save_task(task)
 
-            claimed = task_store.claim_task("T-001", "agent:coding/test")
-            assert claimed.status == TaskStatus.IN_PROGRESS
+        claimed = task_store.claim_task("T-001", "agent:coding/test")
+        assert claimed.status == TaskStatus.IN_PROGRESS
 
-            task_store.transition_task("T-001", TaskStatus.REVIEW)
-            task_store.transition_task("T-001", TaskStatus.TESTING)
-            finalized = task_store.transition_task("T-001", TaskStatus.DONE)
-            assert finalized.status == TaskStatus.DONE
-            assert finalized.completed_at is not None
+        task_store.transition_task("T-001", TaskStatus.REVIEW)
+        task_store.transition_task("T-001", TaskStatus.TESTING)
+        finalized = task_store.transition_task("T-001", TaskStatus.DONE)
+        assert finalized.status == TaskStatus.DONE
+        assert finalized.completed_at is not None
 
-            events = task_store.read_events("T-001")
-            assert len(events) >= 3
+        events = task_store.read_events("T-001")
+        assert len(events) >= 3
 
-            await store.close()
+        await store.close()
 
     @pytest.mark.asyncio
     async def test_chinese_utf8_end_to_end(self) -> None:

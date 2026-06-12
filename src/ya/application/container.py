@@ -70,6 +70,20 @@ class ServiceContainer:
 
         self.registry = ToolRegistry()
         self.registry.register(UtcTimeTool())
+        from ya.tools.builtin.agent_tools import (
+            FileReadTool,
+            FileWriteTool,
+            MemorySaveTool,
+            MemorySearchTool,
+            ShellExecTool,
+            SystemInfoTool,
+        )
+        self.registry.register(FileReadTool())
+        self.registry.register(FileWriteTool())
+        self.registry.register(ShellExecTool())
+        self.registry.register(SystemInfoTool())
+        self.registry.register(MemorySaveTool(self.memory_service))
+        self.registry.register(MemorySearchTool(self.memory_service))
 
         self.policy = PermissionPolicy()
 

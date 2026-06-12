@@ -65,6 +65,16 @@ class AgentLoop:
         )
         await self._store.create_run(run)
 
+        # Add system prompt on first message
+        existing = await self._store.get_messages(session.id)
+        if not existing:
+            await self._store.append_message(session.id, Message(
+                role=MessageRole.SYSTEM,
+                content=self._build_system_prompt(),
+                tool_call_id=_new_id(),
+                created_at=utc_now(),
+            ))
+
         user_msg = Message(
             role=MessageRole.USER,
             content=user_input,
@@ -257,6 +267,35 @@ class AgentLoop:
             created_at=utc_now(),
         )
         await self._store.append_event(run_id, event)
+
+
+    def _build_system_prompt(self) -> str:
+        tools_desc = []
+        for d in self._registry.list_definitions(enabled_only=True):
+            tools_desc.append(f"- {d.name}: {d.description}")
+        tool_list = "\n".join(tools_desc)
+
+        return f"""You are YA, a powerful AI agent running on Linux. You have access to real tools and memory.
+
+## Available Tools
+{tool_list}
+
+## Memory System
+You have persistent memory. Use `memory_save` to remember important information (user preferences, project details, facts). Use `memory_search` to recall saved information.
+
+## File System
+You can read and write files using `file_read` and `file_write`. Use these to help with coding, configuration, and document tasks.
+
+## Shell
+You can execute shell commands with `shell_exec`. Use for system operations, git, package management, etc.
+
+## Guidelines
+- Use tools proactively when they help the user
+- Save important user information to memory automatically
+- Search memory before asking the user for information they've already shared
+- Be concise but thorough
+- When reading large files, summarize key points
+"""
 
 
 def _new_id() -> str:
