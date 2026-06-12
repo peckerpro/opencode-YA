@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import uuid
 
 from ya.domain.agents.models import AgentEvent, Run, RunStatus
@@ -58,6 +59,12 @@ class AgentLoopConfig:
     def __init__(self, max_steps: int = 10, run_timeout_seconds: float = 300.0) -> None:
         self.max_steps = max_steps
         self.run_timeout_seconds = run_timeout_seconds
+
+
+def _strip_thinking(content: str | None) -> str | None:
+    if content is None:
+        return None
+    return re.sub(r"<think>.*?</think>\s*", "", content, flags=re.DOTALL).strip()
 
 
 class AgentLoop:
@@ -141,8 +148,10 @@ class AgentLoop:
                 return
 
             if response.tool_calls:
+                # Save assistant msg WITHOUT thinking process to avoid context pollution
+                clean_content = _strip_thinking(response.content)
                 assistant_msg = Message(
-                    role=MessageRole.ASSISTANT, content=response.content,
+                    role=MessageRole.ASSISTANT, content=clean_content,
                     tool_calls=response.tool_calls,
                     tool_call_id=_new_id(), created_at=utc_now(),
                 )
@@ -159,10 +168,12 @@ class AgentLoop:
                 continue
 
             if response.content:
-                await self._store.append_message(session.id, Message(
-                    role=MessageRole.ASSISTANT, content=response.content,
-                    tool_call_id=_new_id(), created_at=utc_now(),
-                ))
+                clean_content = _strip_thinking(response.content)
+                if clean_content:
+                    await self._store.append_message(session.id, Message(
+                        role=MessageRole.ASSISTANT, content=clean_content,
+                        tool_call_id=_new_id(), created_at=utc_now(),
+                    ))
                 run.status = RunStatus.COMPLETED
                 return
 

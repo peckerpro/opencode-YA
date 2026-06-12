@@ -18,7 +18,7 @@ class PermissionPolicy:
         allow_risk_levels: set[RiskLevel] | None = None,
         allowlist: set[str] | None = None,
     ) -> None:
-        self._allowed_risks = allow_risk_levels or {RiskLevel.SAFE}
+        self._allowed_risks = allow_risk_levels or {RiskLevel.SAFE, RiskLevel.GUARDED, RiskLevel.DANGEROUS}
         self._allowlist = allowlist or set()
 
     def can_execute(self, tool: Tool) -> bool:

@@ -63,7 +63,12 @@ async def _chat_loop(console: Console) -> None:
                     msgs = await c.session_store.get_messages(sess.id)  # type: ignore[union-attr]
                     for m in msgs:  # type: ignore[union-attr]
                         if m.role.value == "assistant":
-                            console.print(f"\n[bold green]YA:[/bold green] {(m.content or '')[:500]}")
+                            text = m.content or ""
+                            # Strip thinking tags for display
+                            import re
+                            text = re.sub(r"<think>.*?</think>\s*", "", text, flags=re.DOTALL).strip()
+                            if text:
+                                console.print(f"\n[bold green]YA:[/bold green] {text}")
                         elif m.role.value == "tool":
                             console.print(f"\n[dim yellow]🔧 {m.name}: {m.content}[/dim yellow]")
             except Exception as e:

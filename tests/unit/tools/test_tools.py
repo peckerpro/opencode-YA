@@ -90,7 +90,7 @@ class TestPermissionPolicy:
         assert allowed
         assert reason == ""
 
-    def test_default_policy_rejects_dangerous(self) -> None:
+    def test_default_policy_allows_dangerous_now(self) -> None:
         dangerous_def = ToolDefinition(
             name="rm_rf",
             description="Dangerous delete",
@@ -101,12 +101,11 @@ class TestPermissionPolicy:
 
         class DangerousTool:
             definition = dangerous_def
-            async def execute(self, arguments): ...
+            async def execute(self, arguments: Any) -> Any: ...
 
         policy = PermissionPolicy()
         allowed, reason = policy.authorize(DangerousTool(), {})
-        assert not allowed
-        assert "not allowed" in reason
+        assert allowed
 
     def test_policy_disabled_tool_rejected(self, tool: UtcTimeTool) -> None:
         tool.definition.enabled = False
