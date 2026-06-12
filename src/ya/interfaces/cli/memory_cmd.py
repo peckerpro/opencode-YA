@@ -1,25 +1,16 @@
 from __future__ import annotations
 
 import asyncio
-import uuid
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
-from ya.adapters.memory.markdown import MarkdownMemoryStore
-from ya.config.paths import resolve_paths
-from ya.config.settings import load_settings
-from ya.domain.memory.models import Memory, MemoryQuery, MemoryType
+from ya.application.memory_service import MemoryService
 
 memory_app = typer.Typer(name="memory", help="Manage Markdown memories")
 console = Console()
-
-
-def _get_store() -> MarkdownMemoryStore:
-    settings = load_settings()
-    paths = resolve_paths(settings)
-    return MarkdownMemoryStore(paths.memory)
+_service = MemoryService()
 
 
 @memory_app.command("add")
@@ -30,16 +21,8 @@ def add_memory(
     tags: str = typer.Option("", "--tags"),
 ) -> None:
     async def _add() -> None:
-        store = _get_store()
-        mem = Memory(
-            id=f"mem-{uuid.uuid4().hex[:8]}",
-            title=title,
-            content=content,
-            memory_type=MemoryType(memory_type),
-            tags=[t.strip() for t in tags.split(",") if t.strip()],
-        )
-        await store.save(mem)
-        console.print(f"[green]Memory saved: {mem.id}[/green]")
+        mid = await _service.add(title, content, memory_type, tags)
+        console.print(f"[green]Memory saved: {mid}[/green]")
     asyncio.run(_add())
 
 
@@ -50,19 +33,15 @@ def list_memories(
     limit: int = typer.Option(20, "--limit", "-l"),
 ) -> None:
     async def _list() -> None:
-        store = _get_store()
-        if search:
-            results = await store.search(MemoryQuery(text_search=search, limit=limit))
-        else:
-            results = await store.list_all()
+        results = await _service.search(query=search, memory_type=memory_type, limit=limit)
         if not results:
             console.print("[dim]No memories found[/dim]")
             return
         table = Table(title="Memories")
         for h in ["ID", "Title", "Type", "Tags"]:
             table.add_column(h)
-        for m in results[:limit]:
-            table.add_row(m.id, m.title[:40], m.memory_type.value, ",".join(m.tags[:3]))
+        for m in results:
+            table.add_row(m["id"], m["title"][:40], m["type"], m["tags"])
         console.print(table)
     asyncio.run(_list())
 
@@ -70,12 +49,11 @@ def list_memories(
 @memory_app.command("show")
 def show_memory(memory_id: str = typer.Argument(...)) -> None:
     async def _show() -> None:
-        store = _get_store()
-        mem = await store.get(memory_id)
+        mem = await _service.show(memory_id)
         if mem is None:
             console.print(f"[red]Memory '{memory_id}' not found[/red]")
         else:
-            console.print(f"[bold]{mem.title}[/bold]")
-            console.print(f"[dim]Type: {mem.memory_type.value} | Tags: {', '.join(mem.tags)}[/dim]")
-            console.print(mem.content)
+            console.print(f"[bold]{mem['title']}[/bold]")
+            console.print(f"[dim]Type: {mem['type']} | Tags: {mem['tags']}[/dim]")
+            console.print(mem["content"])
     asyncio.run(_show())
