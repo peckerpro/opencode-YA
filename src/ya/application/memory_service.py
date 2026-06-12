@@ -33,7 +33,7 @@ class MemoryService:
         if memory_type:
             q.memory_type = MemoryType(memory_type)
         results = await self._store.search(q) if query else await self._store.list_all()
-        return [{"id": m.id, "title": m.title, "type": m.memory_type.value, "tags": ",".join(m.tags[:3])} for m in results[:limit]]
+        return [{"id": m.id, "title": m.title, "content": m.content[:300], "type": m.memory_type.value, "tags": ",".join(m.tags[:3])} for m in results[:limit]]
 
     async def show(self, memory_id: str) -> dict[str, str] | None:
         mem = await self._store.get(memory_id)

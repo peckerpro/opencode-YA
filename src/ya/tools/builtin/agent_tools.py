@@ -140,7 +140,7 @@ async def _memory_search_handler(self: Any, arguments: dict[str, Any]) -> ToolRe
             results = await _memory_service_ref.search(query=query, limit=5)
             if not results:
                 return ToolResult(success=True, content="No matching memories found.")
-            lines = [f"- [{r['id']}] {r['title']}: {r['content'][:200]}" for r in results]
+            lines = [f"- [{r.get('id', '?')}] {r.get('title', '?')}: {r.get('content', '')[:200]}" for r in results]
             return ToolResult(success=True, content="\n".join(lines))
         except Exception as e:
             return ToolResult(success=False, content="", error=str(e))
