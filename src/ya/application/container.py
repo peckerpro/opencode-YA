@@ -75,7 +75,7 @@ class ServiceContainer:
 
         self.rag_service = RAGService(embedder, self.vector_store, self.parser)
         self.cron_service = CronService(self.cron_store)
-        self.memory_service = MemoryService(self.memory_store)
+        self.memory_service = MemoryService(self.memory_store, memory_repo_path=self._paths.memory)
         self._initialized = True
 
     async def close(self) -> None:

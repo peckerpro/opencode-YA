@@ -62,3 +62,16 @@ def show_memory(memory_id: str = typer.Argument(...)) -> None:
         finally:
             await c.close()
     asyncio.run(_show())
+
+
+@memory_app.command("sync")
+def sync_memories() -> None:
+    async def _sync() -> None:
+        c = ServiceContainer()
+        await c.initialize()
+        try:
+            result = await c.memory_service.sync()
+            console.print(f"[green]Sync: {result}[/green]")
+        finally:
+            await c.close()
+    asyncio.run(_sync())
