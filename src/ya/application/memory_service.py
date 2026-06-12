@@ -58,6 +58,7 @@ class MemoryService:
         for cmd, label in [
             (["git", "add", "-A"], "add"),
             (["git", "commit", "-m", f"ya: {message}"], "commit"),
+            (["git", "push", "origin", "master"], "push"),
         ]:
             proc = await asyncio.create_subprocess_exec(*cmd, cwd=repo, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
             stdout, stderr = await proc.communicate()
