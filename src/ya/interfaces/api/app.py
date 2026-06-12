@@ -85,6 +85,28 @@ def create_app() -> FastAPI:
     async def rag_query(query: str = "") -> dict[str, object]:
         return {"results": [], "query": query}
 
+    @app.post("/api/chat")
+    async def api_chat(message: str = "") -> dict[str, object]:
+        from ya.application.container import ServiceContainer
+        c = ServiceContainer()
+        await c.initialize()
+        try:
+            loop = c.create_agent_loop(max_steps=5)
+            if loop is None:
+                return {"response": "LLM not configured", "tool_calls": []}
+            sess = await c.get_or_create_session()
+            await loop.run(sess, message)
+            msgs = await c.session_store.get_messages(sess.id)
+            assistant = [m for m in msgs if m.role.value == "assistant"]
+            tools = [m for m in msgs if m.role.value == "tool"]
+            return {
+                "response": assistant[-1].content if assistant else "",
+                "session_id": sess.id,
+                "tool_calls": [{"name": m.name, "result": m.content} for m in tools],
+            }
+        finally:
+            await c.close()
+
     return app
 
 

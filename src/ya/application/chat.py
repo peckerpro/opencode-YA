@@ -11,6 +11,7 @@ from ya.domain.messages.models import (
     ToolCallRequest,
 )
 from ya.domain.sessions.models import Session, utc_now
+from ya.permissions.audit import AuditEvent, AuditStore
 from ya.ports.llm import LLMProvider
 from ya.ports.stores import SessionStore
 from ya.tools.policy import PermissionPolicy
@@ -35,6 +36,7 @@ class AgentLoop:
         registry: ToolRegistry,
         policy: PermissionPolicy,
         config: AgentLoopConfig | None = None,
+        audit_store: AuditStore | None = None,
     ) -> None:
         self._provider = provider
         self._store = store
@@ -42,6 +44,7 @@ class AgentLoop:
         self._policy = policy
         self._config = config or AgentLoopConfig()
         self._cancelled = False
+        self._audit = audit_store or AuditStore()
 
     def cancel(self) -> None:
         self._cancelled = True
@@ -170,6 +173,14 @@ class AgentLoop:
                         continue
 
                     result = await self._registry.execute(tc.name, arguments)
+                    self._audit.append(AuditEvent(
+                        capability=f"tool.execute.{tool.definition.risk}",
+                        actor_agent_id=run.agent_id,
+                        target_type="tool",
+                        target_id=tc.name,
+                        decision="allowed",
+                        result_status="success" if result.success else "error",
+                    ))
                     tool_msg = Message(
                         role=MessageRole.TOOL,
                         content=result.content if result.success else f"Error: {result.error}",

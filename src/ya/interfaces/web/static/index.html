@@ -1,154 +1,69 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>YA Console</title>
 <style>
 :root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#c9d1d9;--accent:#58a6ff;--green:#3fb950;--yellow:#d2991d;--red:#f85149}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column}
-header{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:12px}
-header h1{font-size:16px;color:var(--accent)}
+body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+header h1{font-size:16px;color:var(--accent)}#status{font-size:12px;opacity:0.7;margin-left:auto}
 nav{display:flex;gap:2px}
 nav button{background:transparent;border:1px solid transparent;color:var(--text);padding:6px 14px;cursor:pointer;font-size:13px;border-radius:6px 6px 0 0}
-nav button:hover{background:var(--surface)}
-nav button.active{background:var(--surface);border-color:var(--border);border-bottom-color:var(--bg)}
-main{flex:1;overflow:hidden;display:flex}
-.panel{display:none;flex:1;flex-direction:column;padding:16px;overflow-y:auto}
-.panel.active{display:flex}
-.chat-area{flex:1;overflow-y:auto;margin-bottom:12px}
-.chat-msg{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px}
-.chat-msg.user{border-color:var(--accent)}
-.chat-msg.tool{background:#1a2332;font-family:monospace}
-.chat-input{display:flex;gap:8px}
+nav button:hover{background:var(--surface)}nav button.active{background:var(--surface);border-color:var(--border);border-bottom-color:var(--bg)}
+main{flex:1;overflow:hidden;display:flex}.panel{display:none;flex:1;flex-direction:column;padding:16px;overflow-y:auto}.panel.active{display:flex}
+#chat-msgs{flex:1;overflow-y:auto;margin-bottom:12px}
+.msg{margin-bottom:8px;padding:10px 14px;border-radius:8px;font-size:13px;line-height:1.5;max-width:85%;white-space:pre-wrap}
+.msg.user{background:var(--accent);color:#fff;margin-left:auto}
+.msg.assistant{background:var(--surface);border:1px solid var(--border)}
+.msg.tool{background:#1a2332;font-family:monospace;font-size:12px;border:1px solid var(--yellow)}
+.msg.error{background:#3d1a1a;border:1px solid var(--red);color:var(--red)}
+.chat-input{display:flex;gap:8px;flex-shrink:0}
 .chat-input input{flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:8px;font-size:14px;outline:none}
 .chat-input input:focus{border-color:var(--accent)}
 .chat-input button{background:var(--accent);color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:14px}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--border)}
-th{color:var(--accent);font-weight:600}
-.status-ok{color:var(--green)} .status-warn{color:var(--yellow)} .status-err{color:var(--red)}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--border)}th{color:var(--accent)}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px}
 .card h3{font-size:14px;margin-bottom:8px;color:var(--accent)}
-.card p{font-size:13px;line-height:1.5}
-.result-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:6px;font-size:13px}
-.result-item .source{color:var(--accent);font-size:11px;margin-bottom:4px}
-#task-table td:last-child{font-family:monospace;font-size:12px}
+.ok{color:var(--green)}.warn{color:var(--yellow)}.err{color:var(--red)}
 </style>
 </head>
 <body>
-<header>
-  <h1>YA Console</h1>
-  <nav>
-    <button class="active" data-panel="chat">Chat</button>
-    <button data-panel="tools">Tools</button>
-    <button data-panel="tasks">Tasks</button>
-    <button data-panel="rag">RAG</button>
-    <button data-panel="cron">Cron</button>
-  </nav>
-  <span style="margin-left:auto;font-size:12px;opacity:0.6" id="status">● disconnected</span>
-</header>
+<header><h1>YA Console</h1>
+<nav>
+<button class="active" data-panel="chat">Chat</button>
+<button data-panel="tools">Tools</button>
+<button data-panel="memory">Memory</button>
+<button data-panel="cron">Cron</button>
+<button data-panel="system">System</button>
+</nav>
+<span id="status">● checking</span></header>
 <main>
-  <div id="chat" class="panel active">
-    <div class="chat-area" id="chat-msgs"></div>
-    <div class="chat-input">
-      <input id="chat-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendChat()">
-      <button onclick="sendChat()">Send</button>
-    </div>
-  </div>
-  <div id="tools" class="panel"><div id="tools-list">Loading...</div></div>
-  <div id="tasks" class="panel">
-    <div class="card"><h3>Task Board</h3><table id="task-table"><thead><tr><th>ID</th><th>Title</th><th>Status</th><th>Owner</th></tr></thead><tbody></tbody></table></div>
-  </div>
-  <div id="rag" class="panel">
-    <div class="chat-input" style="margin-bottom:16px">
-      <input id="rag-input" placeholder="Search knowledge base..." onkeydown="if(event.key==='Enter')searchRAG()">
-      <button onclick="searchRAG()">Search</button>
-    </div>
-    <div id="rag-results"></div>
-  </div>
-  <div id="cron" class="panel"><div id="cron-list">Loading...</div></div>
+<div id="chat" class="panel active"><div id="chat-msgs"></div>
+<div class="chat-input"><input id="chat-input" placeholder="Type message... (Enter to send)"><button onclick="send()">Send</button></div></div>
+<div id="tools" class="panel"><div id="tools-content">Loading...</div></div>
+<div id="memory" class="panel"><div id="memory-content">Loading...</div></div>
+<div id="cron" class="panel"><div id="cron-content">Loading...</div></div>
+<div id="system" class="panel"><div id="system-content">Loading...</div></div>
 </main>
 <script>
-const API='';
-let ws=null;
-
-function connect(){fetch(API+'/health').then(r=>r.json()).then(d=>{document.getElementById('status').innerHTML='● '+d.status;document.getElementById('status').className='status-ok'}).catch(()=>{document.getElementById('status').innerHTML='● disconnected';document.getElementById('status').className='status-err'})}
-
-function switchPanel(name){
-  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
-  document.getElementById(name).classList.add('active');
-  document.querySelector(`[data-panel="${name}"]`).classList.add('active');
-  if(name==='tools')loadTools();
-  if(name==='tasks')loadTasks();
-  if(name==='cron')loadCron();
-}
-
-document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>switchPanel(b.dataset.panel)));
-
-function sendChat(){
-  const input=document.getElementById('chat-input');
-  const msg=input.value.trim();
-  if(!msg)return;
-  addMessage('user',msg);
-  input.value='';
-  fetch(API+'/health').then(()=>addMessage('assistant','YA v0.2 is running. Configure MiniMax API key for LLM chat.'));
-}
-
-function addMessage(role,content){
-  const div=document.createElement('div');
-  div.className='chat-msg '+role;
-  div.textContent=content;
-  document.getElementById('chat-msgs').appendChild(div);
-  div.scrollIntoView({behavior:'smooth'});
-}
-
-function loadTools(){
-  fetch(API+'/api/tools').then(r=>r.json()).then(tools=>{
-    let html='<div class="card"><h3>Registered Tools</h3><table><thead><tr><th>Name</th><th>Source</th><th>Risk</th><th>Enabled</th></tr></thead><tbody>';
-    tools.forEach(t=>{html+=`<tr><td>${t.name}</td><td>${t.source}</td><td><span class="${t.risk==='safe'?'status-ok':t.risk==='dangerous'?'status-err':'status-warn'}">${t.risk}</span></td><td>${t.enabled?'✓':'✗'}</td></tr>`});
-    html+='</tbody></table></div>';
-    document.getElementById('tools-list').innerHTML=html;
-  });
-}
-
-function loadTasks(){
-  document.getElementById('task-table').querySelector('tbody').innerHTML=
-    '<tr><td>YA-001</td><td>Project Foundation</td><td><span class="status-ok">Done</span></td><td>sisyphus</td></tr>'+
-    '<tr><td>V2-001</td><td>Markdown Memory</td><td><span class="status-ok">Done</span></td><td>sisyphus</td></tr>'+
-    '<tr><td>V2-003</td><td>RAG Pipeline</td><td><span class="status-ok">Done</span></td><td>sisyphus</td></tr>';
-}
-
-function searchRAG(){
-  const query=document.getElementById('rag-input').value.trim();
-  if(!query)return;
-  fetch(API+'/api/rag/query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query})})
-    .then(r=>r.json()).then(d=>{
-      let html='';
-      if(d.results&&d.results.length){
-        d.results.forEach(r=>{html+=`<div class="result-item"><div class="source">${r.source||'unknown'}</div>${r.content}</div>`});
-      }else{html='<div class="card"><p>No results found.</p></div>'}
-      document.getElementById('rag-results').innerHTML=html;
-    }).catch(()=>{document.getElementById('rag-results').innerHTML='<div class="card"><p>RAG service not available.</p></div>'});
-}
-
-function loadCron(){
-  fetch(API+'/api/cron/jobs').then(r=>r.json()).then(d=>{
-    let html='<div class="card"><h3>Scheduled Jobs</h3>';
-    if(d.jobs&&d.jobs.length){
-      html+='<table><thead><tr><th>ID</th><th>Name</th><th>Schedule</th><th>Status</th></tr></thead><tbody>';
-      d.jobs.forEach(j=>{html+=`<tr><td>${j.id}</td><td>${j.name}</td><td>${j.schedule||'N/A'}</td><td>${j.status||'active'}</td></tr>`});
-      html+='</tbody></table>';
-    }else{html+='<p>No scheduled jobs.</p>'}
-    html+='</div>';
-    document.getElementById('cron-list').innerHTML=html;
-  });
-}
-
-connect();
-setInterval(connect,30000);
+const A='';
+async function chk(){try{let r=await fetch(A+'/health');let d=await r.json();E('status').innerHTML='● '+d.status;E('status').className='ok'}catch(e){E('status').innerHTML='● offline';E('status').className='err'}}
+chk();setInterval(chk,15000);
+function sw(n){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));E(n).classList.add('active');document.querySelector('[data-panel="'+n+'"]').classList.add('active');n==='tools'&&ldT();n==='memory'&&ldM();n==='cron'&&ldC();n==='system'&&ldS()}
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>sw(b.dataset.panel)));
+function E(id){return document.getElementById(id)}
+async function send(){let i=E('chat-input'),m=i.value.trim();if(!m)return;if(m==='/exit'){add('assistant','Session ended. Refresh to start new.');return}add('user',m);i.value='';
+try{let r=await fetch(A+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m})});let d=await r.json();
+if(d.response)add('assistant',d.response);else add('assistant','Configure MINIMAX_API_KEY in .env and restart ya serve');
+if(d.tool_calls)for(let t of d.tool_calls)add('tool','🔧 '+t.name+': '+t.result)}catch(e){add('error','API unavailable. Run: ya serve')}}
+function add(r,c){let d=document.createElement('div');d.className='msg '+r;d.textContent=c;E('chat-msgs').appendChild(d);d.scrollIntoView({behavior:'smooth'})}
+async function ldT(){try{let r=await fetch(A+'/api/tools'),d=await r.json(),h='<div class="card"><h3>Registered Tools</h3><table><tr><th>Name</th><th>Risk</th><th>Enabled</th></tr>';for(let t of d)h+='<tr><td>'+t.name+'</td><td class="'+(t.risk==='safe'?'ok':'err')+'">'+t.risk+'</td><td>'+(t.enabled?'✓':'✗')+'</td></tr>';h+='</table></div>';E('tools-content').innerHTML=h}catch(e){}}
+async function ldM(){try{let r=await fetch(A+'/api/memory'),d=await r.json();E('memory-content').innerHTML='<div class="card"><h3>Memories</h3><p>'+d.total+' total</p></div>'}catch(e){}}
+async function ldC(){try{let r=await fetch(A+'/api/cron/jobs'),d=await r.json(),h='<div class="card"><h3>Cron Jobs</h3>';if(d.jobs&&d.jobs.length){h+='<table><tr><th>ID</th><th>Name</th><th>Status</th></tr>';for(let j of d.jobs)h+='<tr><td>'+j.id+'</td><td>'+j.name+'</td><td>'+j.status+'</td></tr>';h+='</table>'}else h+='<p>No jobs</p>';h+='</div>';E('cron-content').innerHTML=h}catch(e){}}
+async function ldS(){try{let r=await fetch(A+'/api/root/status'),d=await r.json();E('system-content').innerHTML='<div class="card"><h3>System</h3><p>Sessions: '+d.active_sessions+' active</p><p>Memories: '+d.total_memories+'</p><p>Cron: '+d.active_jobs+' jobs</p><p>Tools: '+d.tools_registered+'</p></div>'}catch(e){}}
+document.getElementById('chat-input').addEventListener('keydown',e=>{if(e.key==='Enter')send()});
 </script>
 </body>
 </html>

@@ -158,3 +158,9 @@ def serve(host: str = typer.Option("127.0.0.1", "--host", "-h"), port: int = typ
     import uvicorn
     console.print(f"[bold]YA Server → {host}:{port}[/bold]")
     uvicorn.run("ya.interfaces.api.app:app", host=host, port=port, reload=False)
+
+
+@app.command()
+def tui() -> None:
+    from ya.interfaces.tui.app import main
+    main()
