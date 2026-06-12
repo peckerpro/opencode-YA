@@ -36,5 +36,13 @@ def spawn_session(task: str = typer.Argument(..., help="Task description")) -> N
 
 @root_app.command("summarize-today")
 def summarize_today() -> None:
-    console.print("[bold]Today's Summary[/bold]")
-    console.print("[dim]No data available yet.[/dim]")
+    console.print("[bold]Today's Digest[/bold]")
+    from ya.domain.instructions.autonomous import AutonomousService
+    svc = AutonomousService()
+    report = svc.generate_daily_digest([], [], [])
+    console.print(f"  Active sessions: {report.active_sessions}")
+    console.print(f"  New memories: {report.new_memories}")
+    if report.highlights:
+        console.print("\n[bold]Highlights:[/bold]")
+        for h in report.highlights:
+            console.print(f"  • {h}")

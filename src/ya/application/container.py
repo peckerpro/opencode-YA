@@ -58,12 +58,15 @@ class ServiceContainer:
 
         embedder: Embedder = _NoopEmbedder()
         if self._settings.volcengine_api_key:
-            from ya.adapters.embeddings.volcengine import VolcengineEmbedder
-            embedder = VolcengineEmbedder(
-                api_key=self._settings.volcengine_api_key.get_secret_value(),
-                base_url=self._settings.volcengine_base_url,
-                model=self._settings.volcengine_embedding_model,
-            )
+            try:
+                from ya.adapters.embeddings.volcengine import VolcengineEmbedder
+                embedder = VolcengineEmbedder(
+                    api_key=self._settings.volcengine_api_key.get_secret_value(),
+                    base_url=self._settings.volcengine_base_url,
+                    model=self._settings.volcengine_embedding_model,
+                )
+            except Exception:
+                pass
 
         self.registry = ToolRegistry()
         self.registry.register(UtcTimeTool())

@@ -110,8 +110,21 @@ async def deny(approval_id: str) -> dict[str, str]:
 
 @router.get("/summarize-all")
 async def summarize_all() -> dict[str, object]:
+    from ya.domain.instructions.autonomous import AutonomousService
+    svc = AutonomousService()
+    report = svc.generate_daily_digest(
+        sessions=list(_sessions.values()),
+        memories=[],
+        tasks=[],
+    )
     return {
-        "total_sessions": 0,
-        "active_sessions": 0,
-        "attention_items": [],
+        "date": report.date,
+        "total_sessions": report.total_messages,
+        "active_sessions": report.active_sessions,
+        "new_memories": report.new_memories,
+        "completed_tasks": report.completed_tasks,
+        "highlights": report.highlights,
+        "attention_items": svc.get_attention_items(
+            list(_sessions.values()), [],
+        ),
     }

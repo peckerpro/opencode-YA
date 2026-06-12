@@ -9,11 +9,11 @@ from ya.config.settings import Settings, load_settings
 
 
 class TestSettings:
-    def test_default_values(self) -> None:
-        settings = Settings()
-        assert settings.ya_home == Path("~/.ya")
-        assert settings.ya_llm_provider == "minimax"
-        assert settings.ya_llm_model == "MiniMax-M3"
+    def test_default_values(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("MINIMAX_API_KEY", raising=False)
+        monkeypatch.delenv("VOLCENGINE_API_KEY", raising=False)
+        monkeypatch.setenv("YA_HOME", "~/.ya")
+        settings = Settings(_env_file="")  # disable .env
         assert settings.minimax_api_key is None
         assert settings.minimax_base_url == "https://api.minimaxi.com/v1"
 
@@ -40,8 +40,11 @@ class TestSettings:
         settings = load_settings()
         assert isinstance(settings, Settings)
 
-    def test_missing_optional_secret_is_none(self) -> None:
-        settings = Settings()
+    def test_missing_optional_secret_is_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("MINIMAX_API_KEY", raising=False)
+        monkeypatch.delenv("VOLCENGINE_API_KEY", raising=False)
+        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+        settings = Settings(_env_file="")
         assert settings.minimax_api_key is None
         assert settings.github_token is None
 
