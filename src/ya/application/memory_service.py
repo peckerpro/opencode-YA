@@ -1,30 +1,17 @@
 from __future__ import annotations
 
 import uuid
-from pathlib import Path
 
 from ya.adapters.memory.markdown import MarkdownMemoryStore
-from ya.config.paths import resolve_paths
-from ya.config.settings import load_settings
 from ya.domain.memory.models import Memory, MemoryQuery, MemoryType
 
 
 class MemoryService:
-    def __init__(self, memory_path: Path | None = None) -> None:
-        if memory_path is None:
-            settings = load_settings()
-            paths = resolve_paths(settings)
-            memory_path = paths.memory
-        self._store = MarkdownMemoryStore(memory_path)
+    def __init__(self, store: MarkdownMemoryStore) -> None:
+        self._store = store
 
     async def add(self, title: str, content: str, memory_type: str = "semantic", tags: str = "") -> str:
-        mem = Memory(
-            id=f"mem-{uuid.uuid4().hex[:8]}",
-            title=title,
-            content=content,
-            memory_type=MemoryType(memory_type),
-            tags=[t.strip() for t in tags.split(",") if t.strip()],
-        )
+        mem = Memory(id=f"mem-{uuid.uuid4().hex[:8]}", title=title, content=content, memory_type=MemoryType(memory_type), tags=[t.strip() for t in tags.split(",") if t.strip()])
         await self._store.save(mem)
         return mem.id
 

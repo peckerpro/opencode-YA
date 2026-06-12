@@ -1,97 +1,63 @@
 from __future__ import annotations
 
 import uuid
-from pathlib import Path
 
-from ya.config.paths import resolve_paths
-from ya.config.settings import load_settings
 from ya.scheduler.models import CronJob, JobStatus, JobType, ScheduleType
 from ya.scheduler.store import SchedulerStore
 
 
 class CronService:
-    def __init__(self, db_path: Path | None = None) -> None:
-        if db_path is None:
-            settings = load_settings()
-            paths = resolve_paths(settings)
-            db_path = paths.cron / "scheduler.db"
-        self._db_path = str(db_path)
+    def __init__(self, store: SchedulerStore) -> None:
+        self._store = store
 
-    async def _get_store(self) -> SchedulerStore:
-        store = SchedulerStore(self._db_path)
-        await store.initialize()
-        return store
+    async def initialize(self) -> None:
+        await self._store.initialize()
+
+    async def close(self) -> None:
+        await self._store.close()
 
     async def list_jobs(self) -> list[dict[str, str]]:
-        store = await self._get_store()
-        try:
-            jobs = await store.list_jobs()
-            return [{"id": j.id, "name": j.name, "type": j.job_type.value, "schedule": j.schedule_value, "status": j.job_status.value} for j in jobs]
-        finally:
-            await store.close()
+        jobs = await self._store.list_jobs()
+        return [{"id": j.id, "name": j.name, "type": j.job_type.value, "schedule": j.schedule_value, "status": j.job_status.value} for j in jobs]
 
     async def add_job(self, name: str, schedule: str = "daily:09:00", job_type: str = "prompt", prompt: str = "") -> str:
         st, sv = _parse_schedule(schedule)
         jt_map = {"prompt": JobType.PROMPT, "tool": JobType.TOOL, "daily_review": JobType.DAILY_REVIEW, "task_check": JobType.TASK_CHECK, "cleanup": JobType.CLEANUP, "report": JobType.REPORT}
         job = CronJob(id=uuid.uuid4().hex[:12], name=name, job_type=jt_map.get(job_type, JobType.PROMPT), schedule_type=st, schedule_value=sv, payload={"prompt": prompt} if prompt else {})
-        store = await self._get_store()
-        try:
-            await store.save_job(job)
-            return job.id
-        finally:
-            await store.close()
+        await self._store.save_job(job)
+        return job.id
 
     async def remove_job(self, job_id: str) -> bool:
-        store = await self._get_store()
-        try:
-            return await store.delete_job(job_id)
-        finally:
-            await store.close()
+        return await self._store.delete_job(job_id)
 
     async def pause_job(self, job_id: str) -> bool:
-        store = await self._get_store()
-        try:
-            job = await store.get_job(job_id)
-            if job:
-                job.job_status = JobStatus.PAUSED
-                await store.save_job(job)
-                return True
+        job = await self._store.get_job(job_id)
+        if not job:
             return False
-        finally:
-            await store.close()
+        job.job_status = JobStatus.PAUSED
+        await self._store.save_job(job)
+        return True
 
     async def resume_job(self, job_id: str) -> bool:
-        store = await self._get_store()
-        try:
-            job = await store.get_job(job_id)
-            if job:
-                job.job_status = JobStatus.ACTIVE
-                await store.save_job(job)
-                return True
+        job = await self._store.get_job(job_id)
+        if not job:
             return False
-        finally:
-            await store.close()
+        job.job_status = JobStatus.ACTIVE
+        await self._store.save_job(job)
+        return True
 
     async def run_job(self, job_id: str) -> dict[str, str] | None:
-        store = await self._get_store()
-        try:
-            job = await store.get_job(job_id)
-            if job is None:
-                return None
-            from ya.scheduler.runner import SchedulerRunner
-            runner = SchedulerRunner(store)
-            run_result = await runner.run_job(job)
-            return {"status": run_result.status.value, "job_id": job_id}
-        finally:
-            await store.close()
+        job = await self._store.get_job(job_id)
+        if job is None:
+            return None
+        from ya.scheduler.runner import SchedulerRunner
+        runner = SchedulerRunner(self._store)
+        run_result = await runner.run_job(job)
+        return {"status": run_result.status.value, "job_id": job_id}
 
     async def get_logs(self, job_id: str, limit: int = 10) -> list[dict[str, str]]:
-        store = await self._get_store()
-        try:
-            runs = await store.get_runs(job_id, limit=limit)
-            return [{"status": r.status.value, "scheduled_at": r.scheduled_at, "summary": r.result_summary} for r in runs]
-        finally:
-            await store.close()
+        runs = await self._store.get_runs(job_id, limit=limit)
+        return [{"status": r.status.value, "scheduled_at": r.scheduled_at, "summary": r.result_summary} for r in runs]
 
 
 def _parse_schedule(schedule: str) -> tuple[ScheduleType, str]:
