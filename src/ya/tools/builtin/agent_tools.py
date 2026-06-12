@@ -149,6 +149,24 @@ async def _memory_search_handler(self: Any, arguments: dict[str, Any]) -> ToolRe
 registry.register(ToolDefinition(name="memory_search", description="Search saved memories. Use BEFORE asking user for information they may have shared before.", parameters={"type": "object", "properties": {"query": {"type": "string", "description": "Search keywords"}}, "required": ["query"]}, source="builtin", risk="safe", enabled=True), handler=type("H", (), {"execute": _memory_search_handler})())
 
 
+# ── memory_get ─────────────────────────────────────────────────────────
+async def _memory_get_handler(self: Any, arguments: dict[str, Any]) -> ToolResult:
+    memory_id = str(arguments.get("memory_id", ""))
+    if not memory_id:
+        return ToolResult(success=False, content="", error="memory_id required")
+    if _memory_service_ref:
+        try:
+            mem = await _memory_service_ref.show(memory_id)
+            if mem:
+                return ToolResult(success=True, content=f"Title: {mem['title']}\nContent: {mem['content']}\nTags: {mem['tags']}")
+            return ToolResult(success=True, content=f"Memory '{memory_id}' not found.")
+        except Exception as e:
+            return ToolResult(success=False, content="", error=str(e))
+    return ToolResult(success=False, content="", error="Memory service not available")
+
+registry.register(ToolDefinition(name="memory_get", description="Retrieve a specific memory by its ID. Use when user references a memory ID directly.", parameters={"type": "object", "properties": {"memory_id": {"type": "string", "description": "Memory ID (e.g. mem-c2e89d83)"}}, "required": ["memory_id"]}, source="builtin", risk="safe", enabled=True), handler=type("H", (), {"execute": _memory_get_handler})())
+
+
 # ── session_search ────────────────────────────────────────────────────
 _session_store_ref: Any = None
 

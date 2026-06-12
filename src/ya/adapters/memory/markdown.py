@@ -90,7 +90,7 @@ class MarkdownMemoryStore:
                 continue
             if query.project and query.project not in mem.projects:
                 continue
-            if query.text_search and query.text_search.lower() not in mem.content.lower():
+            if query.text_search and query.text_search.lower() not in mem.content.lower() and query.text_search.lower() not in mem.title.lower() and query.text_search.lower() not in mem.id.lower():
                 continue
             results.append(mem)
         results.sort(key=lambda m: m.updated_at, reverse=True)
