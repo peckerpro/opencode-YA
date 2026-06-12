@@ -8,7 +8,7 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column}
 header{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0}
-header h1{font-size:16px;color:var(--accent)}#status{font-size:12px;opacity:0.7;margin-left:auto}
+header h1{font-size:16px;color:var(--accent)}#sid{font-size:11px;opacity:0.5;margin:0 8px}#status{font-size:12px;opacity:0.7;margin-left:auto}
 nav{display:flex;gap:2px}
 nav button{background:transparent;border:1px solid transparent;color:var(--text);padding:6px 14px;cursor:pointer;font-size:13px;border-radius:6px 6px 0 0}
 nav button:hover{background:var(--surface)}nav button.active{background:var(--surface);border-color:var(--border);border-bottom-color:var(--bg)}
@@ -20,11 +20,10 @@ main{flex:1;overflow:hidden;display:flex}.panel{display:none;flex:1;flex-directi
 .msg.assistant code{background:var(--code-bg);padding:1px 5px;border-radius:4px;font-size:12px}
 .msg.assistant pre{background:var(--code-bg);padding:10px;border-radius:6px;overflow-x:auto;margin:6px 0;font-size:12px}
 .msg.assistant pre code{padding:0;background:transparent}
-.msg.assistant ul,.msg.assistant ol{padding-left:20px;margin:4px 0}
-.msg.assistant p{margin:4px 0}
-.msg.assistant strong{color:#fff}
-.msg.assistant h3{font-size:14px;margin:8px 0 4px;color:var(--accent)}
+.msg.assistant strong{color:#fff}.msg.assistant h3{font-size:14px;margin:8px 0 4px;color:var(--accent)}
+.msg.assistant ul,.msg.assistant ol{padding-left:20px;margin:4px 0}.msg.assistant p{margin:4px 0}
 .msg.tool{background:#1a2332;font-family:monospace;font-size:12px;border:1px solid var(--yellow)}
+.msg.system{background:transparent;font-size:11px;opacity:0.6;text-align:center;max-width:100%}
 .msg.error{background:#3d1a1a;border:1px solid var(--red);color:var(--red)}
 .chat-input{display:flex;gap:8px;flex-shrink:0}
 .chat-input input{flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:8px;font-size:14px;outline:none}
@@ -37,7 +36,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;p
 </style>
 </head>
 <body>
-<header><h1>YA Console</h1>
+<header><h1>YA Console</h1><span id="sid"></span>
 <nav>
 <button class="active" data-panel="chat">Chat</button>
 <button data-panel="tools">Tools</button>
@@ -48,7 +47,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;p
 <span id="status">● checking</span></header>
 <main>
 <div id="chat" class="panel active"><div id="chat-msgs"></div>
-<div class="chat-input"><input id="chat-input" placeholder="Type message..." onkeydown="if(event.key==='Enter')send()"><button onclick="send()">Send</button></div></div>
+<div class="chat-input"><input id="chat-input" placeholder="Type /help for commands..." onkeydown="if(event.key==='Enter')send()"><button onclick="send()">Send</button></div></div>
 <div id="tools" class="panel"><div id="tools-content">Loading...</div></div>
 <div id="memory" class="panel"><div id="memory-content">Loading...</div></div>
 <div id="cron" class="panel"><div id="cron-content">Loading...</div></div>
@@ -56,7 +55,11 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;p
 </main>
 <script>
 const A='';
+let SID=localStorage.getItem('ya-sid')||'';
+E('sid').textContent=SID?'session:'+SID:'no session';
+
 function E(id){return document.getElementById(id)}
+function saveSid(sid){if(sid){SID=sid;localStorage.setItem('ya-sid',sid);E('sid').textContent='session:'+sid}}
 
 async function chk(){try{let r=await fetch(A+'/health');let d=await r.json();E('status').innerHTML='● '+d.status;E('status').className='ok'}catch(e){E('status').innerHTML='● offline';E('status').className='err'}}
 chk();setInterval(chk,15000);
@@ -66,38 +69,30 @@ document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()
 
 function md2html(t){
   t=t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  t=t.replace(/^### (.+)$/gm,'<h3>$1</h3>');
-  t=t.replace(/^## (.+)$/gm,'<h3>$1</h3>');
-  t=t.replace(/^# (.+)$/gm,'<h3>$1</h3>');
-  t=t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
-  t=t.replace(/`([^`]+)`/g,'<code>$1</code>');
+  t=t.replace(/^### (.+)$/gm,'<h3>$1</h3>');t=t.replace(/^## (.+)$/gm,'<h3>$1</h3>');t=t.replace(/^# (.+)$/gm,'<h3>$1</h3>');
+  t=t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');t=t.replace(/`([^`]+)`/g,'<code>$1</code>');
   t=t.replace(/```(\w*)\n([\s\S]*?)```/g,'<pre><code>$2</code></pre>');
-  t=t.replace(/^- (.+)$/gm,'<li>$1</li>');
-  t=t.replace(/(<li>.*<\/li>\n?)+/g,'<ul>$&</ul>');
-  t=t.replace(/\n\n/g,'</p><p>');
-  t='<p>'+t+'</p>';
-  t=t.replace(/<p><\/p>/g,'');
-  return t
+  t=t.replace(/^- (.+)$/gm,'<li>$1</li>');t=t.replace(/(<li>.*<\/li>\n?)+/g,'<ul>$&</ul>');
+  t=t.replace(/\n\n/g,'</p><p>');t='<p>'+t+'</p>';t=t.replace(/<p><\/p>/g,'');return t
 }
 
 async function send(){
-  let i=E('chat-input'),m=i.value.trim();
-  if(!m)return;i.value='';
-  if(m==='/exit'){add('assistant','Goodbye!');return}
+  let i=E('chat-input'),m=i.value.trim();if(!m)return;i.value='';
   add('user',m);
   try{
-    let r=await fetch(A+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m})});
+    let body={message:m};if(SID)body.session_id=SID;
+    let r=await fetch(A+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     let d=await r.json();
+    if(d.session_id&&d.session_id!==SID)saveSid(d.session_id);
     if(d.response)add('assistant',d.response,true);
-    else add('error','No response. Is MINIMAX_API_KEY configured?');
+    else add('error','No response');
     if(d.tool_calls)for(let t of d.tool_calls)add('tool','🔧 '+t.name+': '+t.result);
-  }catch(e){add('error','API unavailable. Run: ya serve')}
+  }catch(e){add('error','API unavailable. Run: ya serve --host 0.0.0.0')}
 }
 
 function add(role,content,isMd){
   let d=document.createElement('div');d.className='msg '+role;
-  d.innerHTML=isMd?md2html(content):content;
-  E('chat-msgs').appendChild(d);d.scrollIntoView({behavior:'smooth'});
+  d.innerHTML=isMd?md2html(content):content;E('chat-msgs').appendChild(d);d.scrollIntoView({behavior:'smooth'});
 }
 
 async function ldT(){try{let r=await fetch(A+'/api/tools'),d=await r.json(),h='<div class="card"><h3>Tools</h3><table><tr><th>Name</th><th>Risk</th><th>Enabled</th></tr>';for(let t of d)h+='<tr><td>'+t.name+'</td><td class="'+(t.risk==='safe'?'ok':'err')+'">'+t.risk+'</td><td>'+(t.enabled?'✓':'✗')+'</td></tr>';h+='</table></div>';E('tools-content').innerHTML=h}catch(e){}}

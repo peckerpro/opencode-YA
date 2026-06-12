@@ -14,6 +14,7 @@ STATIC_DIR = Path(__file__).parent.parent / "web" / "static"
 
 class ChatRequest(BaseModel):
     message: str = ""
+    session_id: str = ""
 
 
 def create_app() -> FastAPI:
@@ -99,10 +100,14 @@ def create_app() -> FastAPI:
             loop = c.create_agent_loop(max_steps=5)
             if loop is None:
                 return {"response": "LLM not configured", "tool_calls": []}
-            sess = await c.get_or_create_session()
+            sess = await c.get_or_create_session(req.session_id)
             message = req.message.strip()
             if not message:
                 return {"response": "Please enter a message.", "tool_calls": []}
+            if message.startswith("/"):
+                result = await _handle_chat_command(message, sess, c)
+                if result:
+                    return result
             await loop.run(sess, message)
             msgs = await c.session_store.get_messages(sess.id)
             assistant = [m for m in msgs if m.role.value == "assistant"]
@@ -119,3 +124,24 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+
+async def _handle_chat_command(cmd: str, sess: object, container: object) -> dict[str, object] | None:
+    parts = cmd.split(maxsplit=1)
+    c = parts[0].lower()
+    if c in ("/sessions", "/list"):
+        sessions = await container.session_store.list_sessions()  # type: ignore[union-attr,attr-defined]
+        lines = [f"[{s.status.value}] {s.id[:8]} — {s.title[:30]}" for s in sessions[:10]]  # type: ignore[union-attr,attr-defined]
+        return {"response": "Sessions:\n" + "\n".join(lines) if lines else "No sessions.", "session_id": sess.id, "tool_calls": []}  # type: ignore[union-attr,attr-defined]
+    if c == "/new":
+        import uuid
+        new_sid = uuid.uuid4().hex[:8]
+        return {"response": f"New session: {new_sid}", "session_id": new_sid, "tool_calls": []}
+    if c == "/resume" and len(parts) > 1:
+        target_sid = parts[1].strip()
+        return {"response": f"Switched to session: {target_sid}", "session_id": target_sid, "tool_calls": []}
+    if c == "/help":
+        return {"response": "Commands: /sessions /new /resume <id> /help", "session_id": sess.id, "tool_calls": []}  # type: ignore[union-attr,attr-defined]
+    if c == "/status":
+        return {"response": f"Session: {sess.id[:8]}, Status: {sess.status.value}", "session_id": sess.id, "tool_calls": []}  # type: ignore[union-attr,attr-defined]
+    return None
