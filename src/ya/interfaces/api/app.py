@@ -48,20 +48,9 @@ def create_app() -> FastAPI:
 
     @app.get("/api/tools")
     async def list_tools() -> list[dict[str, object]]:
-        from ya.tools.builtin.utc_time import UtcTimeTool
-        from ya.tools.registry import ToolRegistry
-
-        registry = ToolRegistry()
-        registry.register(UtcTimeTool())
-
+        from ya.tools.registry import registry
         return [
-            {
-                "name": d.name,
-                "description": d.description,
-                "source": d.source,
-                "risk": d.risk,
-                "enabled": d.enabled,
-            }
+            {"name": d.name, "description": d.description, "source": d.source, "risk": d.risk, "enabled": d.enabled}
             for d in registry.list_definitions()
         ]
 
@@ -77,11 +66,25 @@ def create_app() -> FastAPI:
 
     @app.get("/api/memory")
     async def list_memories() -> dict[str, object]:
-        return {"memories": [], "total": 0}
+        from ya.application.container import ServiceContainer
+        c = ServiceContainer()
+        await c.initialize()
+        try:
+            memories = await c.memory_service.search(query="", limit=100)
+            return {"memories": memories, "total": len(memories)}
+        finally:
+            await c.close()
 
     @app.get("/api/cron/jobs")
     async def list_cron_jobs() -> dict[str, object]:
-        return {"jobs": [], "total": 0}
+        from ya.application.container import ServiceContainer
+        c = ServiceContainer()
+        await c.initialize()
+        try:
+            jobs = await c.cron_service.list_jobs()
+            return {"jobs": jobs, "total": len(jobs)}
+        finally:
+            await c.close()
 
     @app.post("/api/cron/jobs")
     async def create_cron_job() -> dict[str, str]:
@@ -90,6 +93,17 @@ def create_app() -> FastAPI:
     @app.post("/api/rag/query")
     async def rag_query(query: str = "") -> dict[str, object]:
         return {"results": [], "query": query}
+
+    @app.get("/api/sessions")
+    async def list_sessions_api() -> list[dict[str, object]]:
+        from ya.application.container import ServiceContainer
+        c = ServiceContainer()
+        await c.initialize()
+        try:
+            sessions = await c.session_store.list_sessions()
+            return [{"id": s.id, "title": s.title or s.id[:8], "status": s.status.value} for s in sessions[-30:]]
+        finally:
+            await c.close()
 
     @app.post("/api/chat")
     async def api_chat(req: ChatRequest) -> dict[str, object]:
