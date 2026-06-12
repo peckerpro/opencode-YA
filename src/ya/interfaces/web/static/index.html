@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>YA Console</title>
 <style>
-:root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#c9d1d9;--accent:#58a6ff;--green:#3fb950;--yellow:#d2991d;--red:#f85149}
+:root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#c9d1d9;--accent:#58a6ff;--green:#3fb950;--yellow:#d2991d;--red:#f85149;--code-bg:#1a1a2e}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column}
 header{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0}
@@ -14,9 +14,16 @@ nav button{background:transparent;border:1px solid transparent;color:var(--text)
 nav button:hover{background:var(--surface)}nav button.active{background:var(--surface);border-color:var(--border);border-bottom-color:var(--bg)}
 main{flex:1;overflow:hidden;display:flex}.panel{display:none;flex:1;flex-direction:column;padding:16px;overflow-y:auto}.panel.active{display:flex}
 #chat-msgs{flex:1;overflow-y:auto;margin-bottom:12px}
-.msg{margin-bottom:8px;padding:10px 14px;border-radius:8px;font-size:13px;line-height:1.5;max-width:85%;white-space:pre-wrap}
+.msg{margin-bottom:10px;padding:10px 14px;border-radius:8px;font-size:13px;line-height:1.6;max-width:85%}
 .msg.user{background:var(--accent);color:#fff;margin-left:auto}
 .msg.assistant{background:var(--surface);border:1px solid var(--border)}
+.msg.assistant code{background:var(--code-bg);padding:1px 5px;border-radius:4px;font-size:12px}
+.msg.assistant pre{background:var(--code-bg);padding:10px;border-radius:6px;overflow-x:auto;margin:6px 0;font-size:12px}
+.msg.assistant pre code{padding:0;background:transparent}
+.msg.assistant ul,.msg.assistant ol{padding-left:20px;margin:4px 0}
+.msg.assistant p{margin:4px 0}
+.msg.assistant strong{color:#fff}
+.msg.assistant h3{font-size:14px;margin:8px 0 4px;color:var(--accent)}
 .msg.tool{background:#1a2332;font-family:monospace;font-size:12px;border:1px solid var(--yellow)}
 .msg.error{background:#3d1a1a;border:1px solid var(--red);color:var(--red)}
 .chat-input{display:flex;gap:8px;flex-shrink:0}
@@ -41,7 +48,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;p
 <span id="status">● checking</span></header>
 <main>
 <div id="chat" class="panel active"><div id="chat-msgs"></div>
-<div class="chat-input"><input id="chat-input" placeholder="Type message... (Enter to send)"><button onclick="send()">Send</button></div></div>
+<div class="chat-input"><input id="chat-input" placeholder="Type message..." onkeydown="if(event.key==='Enter')send()"><button onclick="send()">Send</button></div></div>
 <div id="tools" class="panel"><div id="tools-content">Loading...</div></div>
 <div id="memory" class="panel"><div id="memory-content">Loading...</div></div>
 <div id="cron" class="panel"><div id="cron-content">Loading...</div></div>
@@ -49,21 +56,54 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;p
 </main>
 <script>
 const A='';
+function E(id){return document.getElementById(id)}
+
 async function chk(){try{let r=await fetch(A+'/health');let d=await r.json();E('status').innerHTML='● '+d.status;E('status').className='ok'}catch(e){E('status').innerHTML='● offline';E('status').className='err'}}
 chk();setInterval(chk,15000);
-function sw(n){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));E(n).classList.add('active');document.querySelector('[data-panel="'+n+'"]').classList.add('active');n==='tools'&&ldT();n==='memory'&&ldM();n==='cron'&&ldC();n==='system'&&ldS()}
+
+function sw(n){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));E(n).classList.add('active');document.querySelector('[data-panel="'+n+'"]').classList.add('active');if(n==='tools')ldT();if(n==='memory')ldM();if(n==='cron')ldC();if(n==='system')ldS()}
 document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>sw(b.dataset.panel)));
-function E(id){return document.getElementById(id)}
-async function send(){let i=E('chat-input'),m=i.value.trim();if(!m)return;if(m==='/exit'){add('assistant','Session ended. Refresh to start new.');return}add('user',m);i.value='';
-try{let r=await fetch(A+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m})});let d=await r.json();
-if(d.response)add('assistant',d.response);else add('assistant','Configure MINIMAX_API_KEY in .env and restart ya serve');
-if(d.tool_calls)for(let t of d.tool_calls)add('tool','🔧 '+t.name+': '+t.result)}catch(e){add('error','API unavailable. Run: ya serve')}}
-function add(r,c){let d=document.createElement('div');d.className='msg '+r;d.textContent=c;E('chat-msgs').appendChild(d);d.scrollIntoView({behavior:'smooth'})}
-async function ldT(){try{let r=await fetch(A+'/api/tools'),d=await r.json(),h='<div class="card"><h3>Registered Tools</h3><table><tr><th>Name</th><th>Risk</th><th>Enabled</th></tr>';for(let t of d)h+='<tr><td>'+t.name+'</td><td class="'+(t.risk==='safe'?'ok':'err')+'">'+t.risk+'</td><td>'+(t.enabled?'✓':'✗')+'</td></tr>';h+='</table></div>';E('tools-content').innerHTML=h}catch(e){}}
+
+function md2html(t){
+  t=t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  t=t.replace(/^### (.+)$/gm,'<h3>$1</h3>');
+  t=t.replace(/^## (.+)$/gm,'<h3>$1</h3>');
+  t=t.replace(/^# (.+)$/gm,'<h3>$1</h3>');
+  t=t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  t=t.replace(/`([^`]+)`/g,'<code>$1</code>');
+  t=t.replace(/```(\w*)\n([\s\S]*?)```/g,'<pre><code>$2</code></pre>');
+  t=t.replace(/^- (.+)$/gm,'<li>$1</li>');
+  t=t.replace(/(<li>.*<\/li>\n?)+/g,'<ul>$&</ul>');
+  t=t.replace(/\n\n/g,'</p><p>');
+  t='<p>'+t+'</p>';
+  t=t.replace(/<p><\/p>/g,'');
+  return t
+}
+
+async function send(){
+  let i=E('chat-input'),m=i.value.trim();
+  if(!m)return;i.value='';
+  if(m==='/exit'){add('assistant','Goodbye!');return}
+  add('user',m);
+  try{
+    let r=await fetch(A+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m})});
+    let d=await r.json();
+    if(d.response)add('assistant',d.response,true);
+    else add('error','No response. Is MINIMAX_API_KEY configured?');
+    if(d.tool_calls)for(let t of d.tool_calls)add('tool','🔧 '+t.name+': '+t.result);
+  }catch(e){add('error','API unavailable. Run: ya serve')}
+}
+
+function add(role,content,isMd){
+  let d=document.createElement('div');d.className='msg '+role;
+  d.innerHTML=isMd?md2html(content):content;
+  E('chat-msgs').appendChild(d);d.scrollIntoView({behavior:'smooth'});
+}
+
+async function ldT(){try{let r=await fetch(A+'/api/tools'),d=await r.json(),h='<div class="card"><h3>Tools</h3><table><tr><th>Name</th><th>Risk</th><th>Enabled</th></tr>';for(let t of d)h+='<tr><td>'+t.name+'</td><td class="'+(t.risk==='safe'?'ok':'err')+'">'+t.risk+'</td><td>'+(t.enabled?'✓':'✗')+'</td></tr>';h+='</table></div>';E('tools-content').innerHTML=h}catch(e){}}
 async function ldM(){try{let r=await fetch(A+'/api/memory'),d=await r.json();E('memory-content').innerHTML='<div class="card"><h3>Memories</h3><p>'+d.total+' total</p></div>'}catch(e){}}
 async function ldC(){try{let r=await fetch(A+'/api/cron/jobs'),d=await r.json(),h='<div class="card"><h3>Cron Jobs</h3>';if(d.jobs&&d.jobs.length){h+='<table><tr><th>ID</th><th>Name</th><th>Status</th></tr>';for(let j of d.jobs)h+='<tr><td>'+j.id+'</td><td>'+j.name+'</td><td>'+j.status+'</td></tr>';h+='</table>'}else h+='<p>No jobs</p>';h+='</div>';E('cron-content').innerHTML=h}catch(e){}}
 async function ldS(){try{let r=await fetch(A+'/api/root/status'),d=await r.json();E('system-content').innerHTML='<div class="card"><h3>System</h3><p>Sessions: '+d.active_sessions+' active</p><p>Memories: '+d.total_memories+'</p><p>Cron: '+d.active_jobs+' jobs</p><p>Tools: '+d.tools_registered+'</p></div>'}catch(e){}}
-document.getElementById('chat-input').addEventListener('keydown',e=>{if(e.key==='Enter')send()});
 </script>
 </body>
 </html>

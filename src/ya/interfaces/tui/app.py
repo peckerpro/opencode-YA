@@ -4,23 +4,11 @@ import asyncio
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.table import Table
-
-
-def _render(console: Console, messages: list[tuple[str, str]]) -> None:
-    table = Table(title="YA TUI v0.5")
-    table.add_column("Role", style="bold", width=10)
-    table.add_column("Message", max_width=80)
-    for role, text in messages[-20:]:
-        style = "cyan" if role == "user" else "green" if role == "assistant" else "yellow"
-        table.add_row(f"[{style}]{role}[/{style}]", text[:200])
-    console.print(table)
 
 
 async def _chat_loop(console: Console) -> None:
-    messages: list[tuple[str, str]] = []
     console.clear()
-    console.print(Panel("[bold blue]YA TUI v0.5[/bold blue] /exit=quit /help=commands /clear=clear"))
+    console.print(Panel("[bold blue]YA TUI v0.5[/bold blue]  /exit=quit  /help=commands  /clear=clear screen"))
 
     while True:
         try:
@@ -33,15 +21,14 @@ async def _chat_loop(console: Console) -> None:
         if ui == "/exit":
             break
         if ui == "/help":
-            messages.append(("system", "/exit quit, /help this, /clear screen"))
-            _render(console, messages)
+            console.print("[dim]/exit quit | /clear clear screen[/dim]")
             continue
         if ui == "/clear":
-            messages.clear()
-            _render(console, messages)
+            console.clear()
+            console.print(Panel("[bold blue]YA TUI v0.5[/bold blue]"))
             continue
 
-        messages.append(("user", ui))
+        console.print(f"\n[bold cyan]You:[/bold cyan] {ui}")
 
         try:
             from ya.application.container import ServiceContainer
@@ -55,15 +42,13 @@ async def _chat_loop(console: Console) -> None:
                     msgs = await c.session_store.get_messages(sess.id)
                     for m in msgs:
                         if m.role.value == "assistant":
-                            messages.append(("assistant", (m.content or "")[:300]))
+                            console.print(f"\n[bold green]YA:[/bold green] {(m.content or '')[:500]}")
                         elif m.role.value == "tool":
-                            messages.append(("tool", f"🔧 {m.name}: {m.content}"))
+                            console.print(f"\n[dim yellow]🔧 {m.name}: {m.content}[/dim yellow]")
             finally:
                 await c.close()
         except Exception as e:
-            messages.append(("error", str(e)))
-
-        _render(console, messages)
+            console.print(f"\n[red]Error: {e}[/red]")
 
 
 def main() -> None:
