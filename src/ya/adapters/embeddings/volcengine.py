@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from openai import AsyncOpenAI
+import httpx
 
 
 class VolcengineEmbedder:
@@ -11,17 +11,28 @@ class VolcengineEmbedder:
         model: str = "doubao-embedding-vision-251215",
     ) -> None:
         self._model = model
-        self._client = AsyncOpenAI(
-            api_key=api_key,
-            base_url=base_url,
-        )
+        self._endpoint = f"{base_url}/embeddings/multimodal"
+        self._headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
-        response = await self._client.embeddings.create(
-            model=self._model,
-            input=texts,
-        )
-        return [d.embedding for d in response.data]
+        embeddings: list[list[float]] = []
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for text in texts:
+                response = await client.post(
+                    self._endpoint,
+                    headers=self._headers,
+                    json={
+                        "model": self._model,
+                        "input": [{"type": "text", "text": text}],
+                    },
+                )
+                response.raise_for_status()
+                data = response.json()
+                embeddings.append(data["data"]["embedding"])
+        return embeddings
 
     async def embed_query(self, text: str) -> list[float]:
         results = await self.embed([text])

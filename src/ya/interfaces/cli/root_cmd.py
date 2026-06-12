@@ -38,7 +38,7 @@ def root_status() -> None:
             sessions = await c.session_store.list_sessions()
             jobs = await c.cron_service.list_jobs()
             active = sum(1 for s in sessions if s.status.value == "active")
-            console.print(f"[bold]System Status[/bold]")
+            console.print("[bold]System Status[/bold]")
             console.print(f"  Sessions: {active} active / {len(sessions)} total")
             console.print(f"  Cron jobs: {len(jobs)}")
         finally:
