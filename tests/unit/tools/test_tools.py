@@ -19,7 +19,9 @@ class TestToolRegistry:
 
     def test_register_tool(self, registry: ToolRegistry, tool: UtcTimeTool) -> None:
         registry.register(tool)
-        assert registry.get("utc_time") is tool
+        entry = registry.get("utc_time")
+        assert entry is not None
+        assert entry.name == "utc_time"
 
     def test_register_duplicate_raises(
         self, registry: ToolRegistry, tool: UtcTimeTool
@@ -68,13 +70,13 @@ class TestToolRegistry:
     ) -> None:
         registry.register(tool)
         registry.disable("utc_time")
-        with pytest.raises(PermissionError, match="disabled"):
-            await registry.execute("utc_time", {})
+        result = await registry.execute("utc_time", {})
+        assert not result.success
 
     @pytest.mark.asyncio
     async def test_execute_nonexistent_raises(self, registry: ToolRegistry) -> None:
-        with pytest.raises(KeyError):
-            await registry.execute("nonexistent", {})
+        result = await registry.execute("nonexistent", {})
+        assert not result.success
 
 
 class TestPermissionPolicy:

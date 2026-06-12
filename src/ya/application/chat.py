@@ -1,29 +1,61 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import uuid
-from collections.abc import AsyncGenerator
 
 from ya.domain.agents.models import AgentEvent, Run, RunStatus
-from ya.domain.messages.models import (
-    LLMStreamEvent,
-    Message,
-    MessageRole,
-    ToolCallRequest,
-)
+from ya.domain.messages.models import Message, MessageRole, ToolCallRequest
 from ya.domain.sessions.models import Session, utc_now
-from ya.permissions.audit import AuditEvent, AuditStore
 from ya.ports.llm import LLMProvider
 from ya.ports.stores import SessionStore
 from ya.tools.policy import PermissionPolicy
-from ya.tools.registry import ToolRegistry
+from ya.tools.registry import registry as tool_registry
+
+SYSTEM_PROMPT = """You are YA, a powerful AI agent running on Linux. You have access to real tools and persistent memory.
+
+## Identity
+- You are YA, developed as a personal assistant agent
+- You run on a Linux server with file system and shell access
+- You have persistent memory that survives across conversations
+
+## Available Tools
+{tools}
+
+## Memory System
+You have two memory tools:
+- `memory_save`: Save facts, preferences, project details to long-term memory
+- `memory_search`: Search saved memories BEFORE asking the user
+
+**Critical rule**: ALWAYS search memory (`memory_search`) before asking the user for information they may have shared before. If a user says "remember X", use `memory_save` immediately.
+
+## File System
+- `file_read`: Read files or list directories
+- `file_write`: Create or modify files
+
+## Shell
+- `shell_exec`: Run shell commands (timeout: 30s)
+- Use for git, package management, system operations
+
+## Session Management
+- `session_search`: List recent sessions
+- Help users resume previous conversations
+
+## Task Management
+- `task_create`: Create tracked tasks
+
+## Guidelines
+- Be concise but thorough
+- Use tools proactively — they exist to help
+- When reading large files, summarize key points
+- Save important user information to memory automatically
+- Always search memory before asking for previously-shared information
+- Use shell_exec for system operations, file_read/write for file work
+"""
 
 
 class AgentLoopConfig:
-    def __init__(
-        self,
-        max_steps: int = 10,
-        run_timeout_seconds: float = 300.0,
-    ) -> None:
+    def __init__(self, max_steps: int = 10, run_timeout_seconds: float = 300.0) -> None:
         self.max_steps = max_steps
         self.run_timeout_seconds = run_timeout_seconds
 
@@ -33,269 +65,138 @@ class AgentLoop:
         self,
         provider: LLMProvider,
         store: SessionStore,
-        registry: ToolRegistry,
-        policy: PermissionPolicy,
+        policy: PermissionPolicy | None = None,
+        max_steps: int = 10,
+        run_timeout: float = 300.0,
         config: AgentLoopConfig | None = None,
-        audit_store: AuditStore | None = None,
     ) -> None:
         self._provider = provider
         self._store = store
-        self._registry = registry
-        self._policy = policy
-        self._config = config or AgentLoopConfig()
+        self._policy = policy or PermissionPolicy()
+        if config:
+            self._max_steps = config.max_steps
+            self._run_timeout = config.run_timeout_seconds
+        else:
+            self._max_steps = max_steps
+            self._run_timeout = run_timeout
         self._cancelled = False
-        self._audit = audit_store or AuditStore()
 
     def cancel(self) -> None:
         self._cancelled = True
 
-    async def run(
-        self,
-        session: Session,
-        user_input: str,
-        agent_id: str = "",
-        role_id: str = "",
-    ) -> Run:
-        run = Run(
-            id=_new_id(),
-            session_id=session.id,
-            agent_id=agent_id,
-            role_id=role_id,
-            status=RunStatus.RUNNING,
-        )
+    async def run(self, session: Session, user_input: str) -> Run:
+        run = Run(id=_new_id(), session_id=session.id, status=RunStatus.RUNNING)
         await self._store.create_run(run)
 
-        # Add system prompt on first message
         existing = await self._store.get_messages(session.id)
         if not existing:
+            tools_desc = self._build_tools_description()
             await self._store.append_message(session.id, Message(
                 role=MessageRole.SYSTEM,
-                content=self._build_system_prompt(),
-                tool_call_id=_new_id(),
-                created_at=utc_now(),
+                content=SYSTEM_PROMPT.format(tools=tools_desc),
+                tool_call_id=_new_id(), created_at=utc_now(),
             ))
 
-        user_msg = Message(
-            role=MessageRole.USER,
-            content=user_input,
-            tool_call_id=_new_id(),
-            created_at=utc_now(),
-        )
-        await self._store.append_message(session.id, user_msg)
+        await self._store.append_message(session.id, Message(
+            role=MessageRole.USER, content=user_input,
+            tool_call_id=_new_id(), created_at=utc_now(),
+        ))
 
         try:
             await self._execute_loop(session, run)
         except Exception:
-            run.status = RunStatus.FAILED
+            if run.status == RunStatus.RUNNING:
+                run.status = RunStatus.FAILED
             run.finished_at = utc_now()
             await self._store.update_run(run)
             raise
 
-        if self._cancelled:
+        if self._cancelled and run.status == RunStatus.RUNNING:
             run.status = RunStatus.CANCELLED
-        run.finished_at = utc_now()
+        run.finished_at = run.finished_at or utc_now()
         await self._store.update_run(run)
         return run
 
-    async def run_stream(
-        self,
-        session: Session,
-        user_input: str,
-        agent_id: str = "",
-        role_id: str = "",
-    ) -> AsyncGenerator[LLMStreamEvent | Run, None]:
-        run = Run(
-            id=_new_id(),
-            session_id=session.id,
-            agent_id=agent_id,
-            role_id=role_id,
-            status=RunStatus.RUNNING,
-        )
-        await self._store.create_run(run)
-
-        user_msg = Message(
-            role=MessageRole.USER,
-            content=user_input,
-            tool_call_id=_new_id(),
-            created_at=utc_now(),
-        )
-        await self._store.append_message(session.id, user_msg)
-
-        tools = self._registry.list_definitions(enabled_only=True)
-        try:
-            stream = await self._provider.generate_stream(
-                await self._store.get_messages(session.id),
-                tools,
-            )
-            async for event in stream:
-                yield event
-                if event.event_type == "finish":
-                    break
-
-            run.status = RunStatus.COMPLETED
-        except Exception:
-            run.status = RunStatus.FAILED
-
-        run.finished_at = utc_now()
-        await self._store.update_run(run)
-        yield run
+    def _build_tools_description(self) -> str:
+        lines = []
+        for d in tool_registry.list_definitions(enabled_only=True):
+            lines.append(f"- **{d.name}** ({d.risk}): {d.description}")
+        return "\n".join(lines)
 
     async def _execute_loop(self, session: Session, run: Run) -> None:
-        tools = self._registry.list_definitions(enabled_only=True)
+        tools = tool_registry.list_definitions(enabled_only=True)
 
-        for _step in range(self._config.max_steps):
+        for _step in range(self._max_steps):
             if self._cancelled:
                 break
 
             messages = await self._store.get_messages(session.id)
-            response = await self._provider.generate(messages, tools)
+            try:
+                response = await asyncio.wait_for(
+                    self._provider.generate(messages, tools),
+                    timeout=self._run_timeout,
+                )
+            except TimeoutError:
+                run.status = RunStatus.TIMED_OUT
+                return
 
             if response.tool_calls:
                 assistant_msg = Message(
-                    role=MessageRole.ASSISTANT,
-                    content=response.content,
+                    role=MessageRole.ASSISTANT, content=response.content,
                     tool_calls=response.tool_calls,
-                    tool_call_id=_new_id(),
-                    created_at=utc_now(),
+                    tool_call_id=_new_id(), created_at=utc_now(),
                 )
                 await self._store.append_message(session.id, assistant_msg)
-                await self._log_event(run.id, "tool_call", str(response.tool_calls))
 
                 for tc in response.tool_calls:
                     if self._cancelled:
                         break
-
-                    tool = self._registry.get(tc.name)
-                    if tool is None:
-                        await self._handle_missing_tool(session, tc)
-                        continue
-
-                    allowed, reason = self._policy.authorize(tool, {})
-                    if not allowed:
-                        await self._handle_denied_tool(session, tc, reason)
-                        continue
-
-                    try:
-                        import json
-                        arguments = json.loads(tc.arguments)
-                    except json.JSONDecodeError:
-                        await self._handle_invalid_args(session, tc)
-                        continue
-
-                    result = await self._registry.execute(tc.name, arguments)
-                    self._audit.append(AuditEvent(
-                        capability=f"tool.execute.{tool.definition.risk}",
-                        actor_agent_id=run.agent_id,
-                        target_type="tool",
-                        target_id=tc.name,
-                        decision="allowed",
-                        result_status="success" if result.success else "error",
+                    result = await self._execute_tool(tc)
+                    await self._store.append_message(session.id, Message(
+                        role=MessageRole.TOOL, content=result.content if result.success else f"Error: {result.error}",
+                        tool_call_id=tc.id, name=tc.name, created_at=utc_now(),
                     ))
-                    tool_msg = Message(
-                        role=MessageRole.TOOL,
-                        content=result.content if result.success else f"Error: {result.error}",
-                        tool_call_id=tc.id,
-                        name=tc.name,
-                        created_at=utc_now(),
-                    )
-                    await self._store.append_message(session.id, tool_msg)
-                    await self._log_event(run.id, "tool_result", result.content)
-
                 continue
 
             if response.content:
-                assistant_msg = Message(
-                    role=MessageRole.ASSISTANT,
-                    content=response.content,
-                    tool_call_id=_new_id(),
-                    created_at=utc_now(),
-                )
-                await self._store.append_message(session.id, assistant_msg)
-                await self._log_event(run.id, "text_response", response.content)
+                await self._store.append_message(session.id, Message(
+                    role=MessageRole.ASSISTANT, content=response.content,
+                    tool_call_id=_new_id(), created_at=utc_now(),
+                ))
                 run.status = RunStatus.COMPLETED
-                break
+                return
 
             run.status = RunStatus.COMPLETED
-            break
-        else:
-            run.status = RunStatus.TIMED_OUT
+            return
 
-    async def _handle_missing_tool(
-        self, session: Session, tc: ToolCallRequest
-    ) -> Message:
-        msg = Message(
-            role=MessageRole.TOOL,
-            content=f"Error: Tool '{tc.name}' not found",
-            tool_call_id=tc.id,
-            name=tc.name,
-            created_at=utc_now(),
-        )
-        await self._store.append_message(session.id, msg)
-        return msg
+        run.status = RunStatus.TIMED_OUT
 
-    async def _handle_denied_tool(
-        self, session: Session, tc: ToolCallRequest, reason: str
-    ) -> Message:
-        msg = Message(
-            role=MessageRole.TOOL,
-            content=f"Error: {reason}",
-            tool_call_id=tc.id,
-            name=tc.name,
-            created_at=utc_now(),
-        )
-        await self._store.append_message(session.id, msg)
-        return msg
+    async def _execute_tool(self, tc: ToolCallRequest) -> object:
+        entry = tool_registry.get(tc.name)
+        if entry is None:
+            return type("R", (), {"success": False, "content": "", "error": f"Tool '{tc.name}' not found"})()
+        if not entry.definition.enabled:
+            return type("R", (), {"success": False, "content": "", "error": f"Tool '{tc.name}' is disabled"})()
 
-    async def _handle_invalid_args(
-        self, session: Session, tc: ToolCallRequest
-    ) -> None:
-        msg = Message(
-            role=MessageRole.TOOL,
-            content=f"Error: Invalid arguments for tool '{tc.name}'",
-            tool_call_id=tc.id,
-            name=tc.name,
-            created_at=utc_now(),
-        )
-        await self._store.append_message(session.id, msg)
+        allowed, reason = self._policy.authorize(entry, {})
+        if not allowed:
+            return type("R", (), {"success": False, "content": "", "error": reason})()
+
+        try:
+            args = json.loads(tc.arguments) if isinstance(tc.arguments, str) else tc.arguments
+        except json.JSONDecodeError:
+            args = {}
+
+        try:
+            return await entry.handler.execute(args)
+        except Exception as e:
+            return type("R", (), {"success": False, "content": "", "error": str(e)})()
 
     async def _log_event(self, run_id: str, event_type: str, payload: str) -> None:
-        event = AgentEvent(
-            id=_new_id(),
-            run_id=run_id,
-            event_type=event_type,
-            payload=payload[:500],
-            created_at=utc_now(),
-        )
-        await self._store.append_event(run_id, event)
-
-
-    def _build_system_prompt(self) -> str:
-        tools_desc = []
-        for d in self._registry.list_definitions(enabled_only=True):
-            tools_desc.append(f"- {d.name}: {d.description}")
-        tool_list = "\n".join(tools_desc)
-
-        return f"""You are YA, a powerful AI agent running on Linux. You have access to real tools and memory.
-
-## Available Tools
-{tool_list}
-
-## Memory System
-You have persistent memory. Use `memory_save` to remember important information (user preferences, project details, facts). Use `memory_search` to recall saved information.
-
-## File System
-You can read and write files using `file_read` and `file_write`. Use these to help with coding, configuration, and document tasks.
-
-## Shell
-You can execute shell commands with `shell_exec`. Use for system operations, git, package management, etc.
-
-## Guidelines
-- Use tools proactively when they help the user
-- Save important user information to memory automatically
-- Search memory before asking the user for information they've already shared
-- Be concise but thorough
-- When reading large files, summarize key points
-"""
+        await self._store.append_event(run_id, AgentEvent(
+            id=_new_id(), run_id=run_id, event_type=event_type,
+            payload=payload[:500], created_at=utc_now(),
+        ))
 
 
 def _new_id() -> str:

@@ -147,9 +147,9 @@ def tools_list() -> None:
     table = Table(title="Registered Tools")
     for h in ["Name", "Source", "Risk", "Enabled", "Description"]:
         table.add_column(h, style="cyan" if h == "Name" else "")
-    for name, tool in sorted(registry.list_all().items()):
-        d = tool.definition
-        table.add_row(name, d.source, f"[{d.risk}]{d.risk}[/{d.risk}]", "yes" if d.enabled else "no", d.description)
+    for entry in sorted(registry.list_all(), key=lambda e: e.name):
+        d = entry.definition
+        table.add_row(entry.name, d.source, f"[{d.risk}]{d.risk}[/{d.risk}]", "yes" if d.enabled else "no", d.description)
     console.print(table)
 
 

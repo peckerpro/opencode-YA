@@ -92,7 +92,6 @@ def loop(
     return AgentLoop(
         provider=fake_provider,
         store=store,
-        registry=registry,
         policy=policy,
         config=AgentLoopConfig(max_steps=5),
     )
