@@ -5,10 +5,15 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from ya.interfaces.api.root import router as root_router
 
 STATIC_DIR = Path(__file__).parent.parent / "web" / "static"
+
+
+class ChatRequest(BaseModel):
+    message: str = ""
 
 
 def create_app() -> FastAPI:
@@ -86,7 +91,7 @@ def create_app() -> FastAPI:
         return {"results": [], "query": query}
 
     @app.post("/api/chat")
-    async def api_chat(message: str = "") -> dict[str, object]:
+    async def api_chat(req: ChatRequest) -> dict[str, object]:
         from ya.application.container import ServiceContainer
         c = ServiceContainer()
         await c.initialize()
@@ -95,6 +100,9 @@ def create_app() -> FastAPI:
             if loop is None:
                 return {"response": "LLM not configured", "tool_calls": []}
             sess = await c.get_or_create_session()
+            message = req.message.strip()
+            if not message:
+                return {"response": "Please enter a message.", "tool_calls": []}
             await loop.run(sess, message)
             msgs = await c.session_store.get_messages(sess.id)
             assistant = [m for m in msgs if m.role.value == "assistant"]
